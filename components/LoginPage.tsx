@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -13,11 +13,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   onBack,
   message = 'Đăng nhập bằng Google để làm bài kiểm tra và lưu kết quả khảo sát',
 }) => {
-  const { signInWithGoogle } = useAuth();
+  const { signInWithGoogle, authError, clearAuthError } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+      setSubmitting(false);
+    }
+  }, [authError]);
+
   const handleGoogleSignIn = async () => {
+    clearAuthError();
     setError(null);
     setSubmitting(true);
     const { error: err } = await signInWithGoogle();
@@ -25,7 +33,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       setError(err);
       setSubmitting(false);
     }
-    // On success Cognito redirects away; no local state update needed.
+    // On success Cognito redirects away; whitelist is checked after redirect.
   };
 
   return (
@@ -87,13 +95,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </button>
 
             <p className="text-center text-xs text-slate-400 leading-relaxed">
-              Chỉ hỗ trợ đăng nhập qua Google (AWS Cognito). Không dùng email/mật khẩu.
+              Chỉ email đã được quản trị viên thêm vào hệ thống mới được phép đăng nhập. Google SSO
+              — không dùng email/mật khẩu.
             </p>
           </div>
         </div>
 
         <button
-          onClick={onBack}
+          onClick={() => {
+            clearAuthError();
+            onBack();
+          }}
           className="mt-6 w-full py-3 rounded-xl border border-slate-200 text-slate-500 font-bold hover:bg-slate-50 hover:text-slate-700 transition-colors uppercase tracking-wider text-xs active:scale-95"
         >
           Quay lại trang chủ

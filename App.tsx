@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { questions } from './data/questions';
 import { Gender, ScoreLevel } from './types';
@@ -24,7 +24,7 @@ const logo = '/logo.jpg';
 type AppStep = 'landing' | 'login' | 'records' | 'admin' | 'gender' | 'quiz' | 'result';
 
 export default function App() {
-  const { user, profile, isAdmin, signOut, loading: authLoading } = useAuth();
+  const { user, profile, isAdmin, signOut, loading: authLoading, authError } = useAuth();
   const [step, setStep] = useState<AppStep>('landing');
   const [gender, setGender] = useState<Gender | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -43,6 +43,12 @@ export default function App() {
   }, [gender]);
 
   const results = useConstitutionCalculation(answers, gender);
+
+  useEffect(() => {
+    if (!authLoading && authError && !user && step === 'landing') {
+      setStep('login');
+    }
+  }, [authLoading, authError, user, step]);
 
   const handleStart = () => {
     if (!user) {
@@ -237,6 +243,12 @@ export default function App() {
                   </>
                 )}
               </div>
+
+              {!user && authError && (
+                <div className="max-w-lg mx-auto p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm font-medium">
+                  {authError}
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -250,7 +262,7 @@ export default function App() {
             >
               <LoginPage
                 onBack={handleReset}
-                message="Bạn cần đăng nhập bằng Google trước khi làm bài kiểm tra và lưu kết quả."
+                message="Chỉ tài khoản đã được admin thêm email mới đăng nhập được. Đăng nhập bằng Google SSO."
               />
             </motion.div>
           )}

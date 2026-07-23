@@ -12,8 +12,11 @@ const schema = a.schema({
       role: a.enum(['user', 'admin']),
     })
     .authorization((allow) => [
-      allow.owner(),
-      allow.group('ADMIN').to(['read', 'update', 'delete']),
+      // Admins invite users by email+role before Google SSO is allowed.
+      allow.group('ADMIN').to(['create', 'read', 'update', 'delete']),
+      // Authenticated users may read so login can verify the email whitelist.
+      allow.authenticated().to(['read']),
+      allow.owner().to(['read', 'update']),
     ]),
 
   SurveyRecord: a

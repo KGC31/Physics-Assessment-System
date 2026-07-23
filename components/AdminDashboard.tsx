@@ -43,6 +43,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [filterUserId, setFilterUserId] = useState<string>('all');
 
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'user' | 'admin'>('user');
+  const [inviteName, setInviteName] = useState('');
+  const [inviteSaving, setInviteSaving] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+
   useEffect(() => {
     fetchUsers();
     fetchRecords();
@@ -106,6 +114,91 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
       setRecords((prev) => prev.filter((r) => r.id !== recordId));
       setDeleteConfirm(null);
     }
+  };
+
+  const handleAddInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setInviteError(null);
+    setInviteSuccess(null);
+
+    const email = inviteEmail.trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setInviteError('Email không hợp lệ.');
+      return;
+    }
+
+    setInviteSaving(true);
+
+    const existing = await dataClient.models.Profile.list({
+      filter: { email: { eq: email } },
+      limit: 10,
+    });
+    const already =
+      existing.data?.find((p) => p.email.toLowerCase() === email) ??
+      existing.data?.[0];
+
+    if (already) {
+      const { data, errors } = await dataClient.models.Profile.update({
+        id: already.id,
+        role: inviteRole,
+        fullName: inviteName.trim() || already.fullName || undefined,
+      });
+      setInviteSaving(false);
+      if (errors?.length || !data) {
+        setInviteError(errors?.map((err) => err.message).join(', ') || 'Không cập nhật được.');
+        return;
+      }
+      setUsers((prev) => {
+        const mapped = {
+          id: data.id,
+          email: data.email,
+          role: (data.role as 'admin' | 'user') ?? inviteRole,
+          full_name: data.fullName ?? null,
+          created_at: data.createdAt ?? new Date().toISOString(),
+          updated_at: data.updatedAt ?? new Date().toISOString(),
+        };
+        const without = prev.filter((u) => u.id !== data.id);
+        return [mapped, ...without];
+      });
+      setInviteSuccess(`Đã cập nhật quyền cho ${email} (${inviteRole}).`);
+      setInviteEmail('');
+      setInviteName('');
+      setInviteRole('user');
+      return;
+    }
+
+    const { data, errors } = await dataClient.models.Profile.create({
+      email,
+      role: inviteRole,
+      fullName: inviteName.trim() || undefined,
+    });
+
+    setInviteSaving(false);
+
+    if (errors?.length || !data) {
+      setInviteError(
+        errors?.map((err) => err.message).join(', ') ||
+          'Không thêm được. Kiểm tra quyền Cognito ADMIN.'
+      );
+      return;
+    }
+
+    setUsers((prev) => [
+      {
+        id: data.id,
+        email: data.email,
+        role: (data.role as 'admin' | 'user') ?? inviteRole,
+        full_name: data.fullName ?? null,
+        created_at: data.createdAt ?? new Date().toISOString(),
+        updated_at: data.updatedAt ?? new Date().toISOString(),
+      },
+      ...prev,
+    ]);
+    setInviteSuccess(`Đã thêm ${email} với vai trò ${inviteRole}.`);
+    setInviteEmail('');
+    setInviteName('');
+    setInviteRole('user');
+    setShowAddForm(false);
   };
 
   const handleExportCSV = () => {
@@ -224,17 +317,107 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
             Quản lý người dùng và dữ liệu khảo sát (Cognito Google SSO · DynamoDB)
           </p>
         </div>
-        <button
-          onClick={onBack}
-          className="px-6 py-2.5 rounded-xl border border-slate-200 text-slate-500 font-bold hover:bg-slate-50 hover:text-slate-700 transition-colors text-sm active:scale-95 self-start"
-        >
-          ← Quay lại
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start">
+          <button
+            type="button"
+            onClick={() => {
+              setShowAddForm((v) => !v);
+              setInviteError(null);
+              setInviteSuccess(null);
+            }}
+            className="px-5 py-2.5 rounded-xl bg-violet-600 text-white font-bold hover:bg-violet-700 transition-colors text-sm active:scale-95 shadow-sm"
+          >
+            {showAddForm ? 'Đóng form' : '+ Thêm email / vai trò'}
+          </button>
+          <button
+            onClick={onBack}
+            className="px-6 py-2.5 rounded-xl border border-slate-200 text-slate-500 font-bold hover:bg-slate-50 hover:text-slate-700 transition-colors text-sm active:scale-95"
+          >
+            ← Quay lại
+          </button>
+        </div>
       </div>
 
+      {showAddForm && (
+        <form
+          onSubmit={handleAddInvite}
+          className="mb-6 p-5 rounded-2xl bg-white border-2 border-violet-200 shadow-sm space-y-4"
+        >
+          <div>
+            <h3 className="text-base font-bold text-slate-800">Thêm tài khoản được phép đăng nhập</h3>
+            <p className="text-sm text-slate-600 mt-1 leading-relaxed">
+              Chỉ email đã được thêm mới đăng nhập Google thành công. Email chưa có trong danh sách
+              sẽ bị từ chối sau SSO.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="sm:col-span-1">
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Email Google *</label>
+              <input
+                type="email"
+                required
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="user@example.com"
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-violet-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Họ tên (tuỳ chọn)</label>
+              <input
+                type="text"
+                value={inviteName}
+                onChange={(e) => setInviteName(e.target.value)}
+                placeholder="Nguyễn Văn A"
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-violet-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Vai trò *</label>
+              <select
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value as 'user' | 'admin')}
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:border-violet-500"
+              >
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+          </div>
+
+          {inviteRole === 'admin' && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+              Vai trò Admin trong app. Để thao tác dữ liệu quản trị qua API, hãy thêm user vào nhóm
+              Cognito <strong>ADMIN</strong> sau khi họ đăng nhập lần đầu.
+            </p>
+          )}
+
+          {inviteError && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm font-medium">
+              {inviteError}
+            </div>
+          )}
+          {inviteSuccess && (
+            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-medium">
+              {inviteSuccess}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={inviteSaving}
+            className="px-5 py-2.5 rounded-xl bg-violet-600 text-white font-bold hover:bg-violet-700 text-sm active:scale-95 disabled:opacity-60"
+          >
+            {inviteSaving ? 'Đang lưu...' : 'Lưu email vào danh sách'}
+          </button>
+        </form>
+      )}
+
       <div className="mb-6 p-4 rounded-xl bg-violet-50 border border-violet-100 text-sm text-violet-800">
-        Người dùng mới đăng nhập Google được gán nhóm <strong>USER</strong>. Để cấp quyền admin,
-        thêm họ vào nhóm Cognito <strong>ADMIN</strong> trong AWS Console.
+        Đăng nhập là <strong>invite-only</strong>: thêm email tại đây trước. Google SSO với email
+        chưa có trong danh sách sẽ không được cấp quyền. Nhóm Cognito <strong>ADMIN</strong> vẫn
+        cần cho thao tác quản trị dữ liệu.
       </div>
 
       <div className="flex gap-1 mb-8 bg-slate-100 p-1 rounded-xl w-fit">

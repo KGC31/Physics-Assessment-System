@@ -3,7 +3,7 @@ import { postConfirmation } from "./post-confirmation/resource";
 
 export const auth = defineAuth({
   loginWith: {
-    email: false,
+    email: true,
     externalProviders: {
       google: {
         clientId: secret("GOOGLE_CLIENT_ID"),
