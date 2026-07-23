@@ -1,93 +1,153 @@
-# physics-assessment
+# Physics Assessment
 
+Next.js app for constitutional-type / physics assessment surveys, backed by **AWS Amplify Gen 2** (Cognito + AppSync/DynamoDB). Sign-in is **Google SSO only** via Cognito.
 
+## Stack
 
-## Getting started
+- **Frontend:** Next.js 14, React 18, Tailwind CSS
+- **Auth:** Amazon Cognito (Google OAuth), groups `USER` and `ADMIN`
+- **Data:** Amplify Data → AppSync + DynamoDB (`Profile`, `SurveyRecord`)
+- **Backend tooling:** Amplify Gen 2 (`ampx` sandbox / pipeline deploy)
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Prerequisites
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+| Tool | Notes |
+|------|--------|
+| Node.js 18+ | Matches Next.js 14 |
+| npm | Used by project scripts |
+| AWS account | For Amplify sandbox / hosting |
+| [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) | Configure credentials locally |
+| Google Cloud OAuth client | Web application client ID + secret |
 
-## Add your files
+## Environment overview
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+This app does **not** load Google OAuth credentials from a local `.env` file.
 
+| Kind | Where it lives | Used for |
+|------|----------------|----------|
+| Amplify sandbox secrets | AWS SSM Parameter Store (via `ampx sandbox secret`) | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` in Cognito |
+| Generated client config | `amplify_outputs.json` (gitignored) | Frontend Amplify configure after sandbox/deploy |
+| Optional local env files | `.env`, `.env.local` | Not required for core auth/data today; see [`.env.example`](.env.example) |
+
+Copy the example file if you want a local placeholder:
+
+```bash
+cp .env.example .env
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/hnhnutrition-group/physics-assessment.git
-git branch -M main
-git push -uf origin main
+
+`.env` / `.env.local` are for future app-level variables if you add them. Do **not** put Google client secrets in `.env` — Cognito reads them from Amplify secrets via `secret('GOOGLE_CLIENT_ID')` / `secret('GOOGLE_CLIENT_SECRET')` in `amplify/auth/resource.ts`.
+
+## Configure AWS
+
+### 1. Create credentials
+
+Create an IAM user (or use IAM Identity Center / SSO) with permissions to deploy Amplify Gen 2 sandboxes (CloudFormation, Cognito, AppSync, DynamoDB, Lambda, SSM, etc.). For local work, an access key pair is typical.
+
+### 2. Configure the AWS CLI
+
+```bash
+aws configure
 ```
 
-## Integrate with your tools
+You will be prompted for:
 
-* [Set up project integrations](https://gitlab.com/hnhnutrition-group/physics-assessment/-/settings/integrations)
+- **AWS Access Key ID**
+- **AWS Secret Access Key**
+- **Default region** (e.g. `ap-southeast-1`)
+- **Default output format** (e.g. `json`)
 
-## Collaborate with your team
+Verify:
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+```bash
+aws sts get-caller-identity
+```
 
-## Test and Deploy
+### 3. Named profiles (optional)
 
-Use the built-in continuous integration in GitLab.
+If you use multiple accounts:
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+```bash
+aws configure --profile physics-assessment
+```
 
-***
+Then pass the profile to Amplify commands:
 
-# Editing this README
+```bash
+npx ampx sandbox --profile physics-assessment
+npx ampx sandbox secret set GOOGLE_CLIENT_ID --profile physics-assessment
+```
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+### 4. CDK bootstrap (first time per account/region)
 
-## Suggestions for a good README
+Amplify Gen 2 uses CDK. If sandbox fails with “account/region has not been bootstrapped”:
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+```bash
+npx aws-cdk@latest bootstrap aws://ACCOUNT_ID/REGION
+```
 
-## Name
-Choose a self-explaining name for your project.
+Replace `ACCOUNT_ID` and `REGION` with values from `aws sts get-caller-identity` and your configured region.
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+## Google OAuth (Amplify secrets, not `.env`)
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+1. In [Google Cloud Console](https://console.cloud.google.com/), create an **OAuth 2.0 Client ID** (Web application).
+2. Add authorized redirect URIs for Cognito’s hosted UI / IdP callback (Amplify prints Cognito domain details after sandbox starts; also check the Cognito console).
+3. Set sandbox secrets (values are prompted interactively):
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+```bash
+npx ampx sandbox secret set GOOGLE_CLIENT_ID
+npx ampx sandbox secret set GOOGLE_CLIENT_SECRET
+```
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+List / remove secrets:
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+```bash
+npx ampx sandbox secret list
+npx ampx sandbox secret remove GOOGLE_CLIENT_ID
+```
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+For **Amplify Hosting** branch deploys, set the same secret names in the Amplify console (**Hosting → Secrets**). Sandbox secrets do not appear there; they live in SSM under the `/amplify` prefix.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+Local callback/logout URLs currently configured in `amplify/auth/resource.ts`:
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+- `http://localhost:3000`
+- `http://localhost:3000/`
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+Add production URLs there (and in Google Cloud) before deploying a live site.
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+## Local development
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+```bash
+npm install
+```
 
-## License
-For open source projects, say how it is licensed.
+Start the Amplify cloud sandbox (writes `amplify_outputs.json`):
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+```bash
+npx ampx sandbox
+```
+
+In another terminal:
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+### Useful scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Next.js dev server |
+| `npm run build` | Production build |
+| `npm run start` | Serve production build |
+| `npm run lint` | ESLint |
+| `npx ampx sandbox` | Deploy/watch local backend sandbox |
+
+## Roles (ADMIN)
+
+New users are placed in the Cognito `USER` group (post-confirmation trigger). To grant admin access, add the user to the Cognito `ADMIN` group in the AWS Console.
+
+## Hosting note
+
+`amplify.yml` runs `npx ampx pipeline-deploy` using Amplify-provided `AWS_BRANCH` and `AWS_APP_ID`. Ensure branch secrets for Google OAuth are configured in the Amplify console before relying on Google sign-in in deployed environments.
