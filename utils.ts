@@ -24,3 +24,16 @@ export function cn(...classes: ClassValue[]): string {
   // Simplified custom class merger (doesn't handle complex tailwind conflict resolution without tailwind-merge, but good enough for simple cases)
   return result.join(' ').trim();
 }
+
+/** Amplify a.json() / AWSJSON may arrive as a string or already-parsed value. */
+export function parseJsonField<T>(value: unknown, fallback: T): T {
+  if (value == null) return fallback;
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return fallback;
+    }
+  }
+  return value as T;
+}

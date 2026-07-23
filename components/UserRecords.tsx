@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { dataClient } from '../lib/amplifyClient';
 import { useAuth } from '../contexts/AuthContext';
+import { parseJsonField } from '../utils';
 
 interface SurveyRecord {
   id: string;
@@ -43,8 +44,8 @@ function mapRecord(raw: {
     birth_year: raw.birthYear ?? 0,
     address: raw.address ?? '',
     gender: raw.gender ?? 'nam',
-    answers: (raw.answers as Record<string, number>) ?? {},
-    results: (raw.results as SurveyRecord['results']) ?? [],
+    answers: parseJsonField<Record<string, number>>(raw.answers, {}),
+    results: parseJsonField<SurveyRecord['results']>(raw.results, []),
     created_at: raw.createdAt ?? new Date().toISOString(),
   };
 }

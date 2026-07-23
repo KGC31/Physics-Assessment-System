@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import { dataClient } from '../lib/amplifyClient';
 import { useAuth, Profile } from '../contexts/AuthContext';
 import { questions } from '../data/questions';
+import { parseJsonField } from '../utils';
 
 interface SurveyRecord {
   id: string;
@@ -76,8 +77,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
           birth_year: r.birthYear ?? 0,
           address: r.address ?? '',
           gender: r.gender ?? 'nam',
-          answers: (r.answers as Record<string, number>) ?? {},
-          results: (r.results as SurveyRecord['results']) ?? [],
+          answers: parseJsonField<Record<string, number>>(r.answers, {}),
+          results: parseJsonField<SurveyRecord['results']>(r.results, []),
           created_at: r.createdAt ?? new Date().toISOString(),
           ownerEmail: r.ownerEmail,
           ownerName: r.ownerName,

@@ -132,13 +132,14 @@ export const ResultDashboard: React.FC<ResultDashboardProps> = ({
     setSaving(true);
     setSaveError(null);
 
+    // a.json() maps to AWSJSON — AppSync expects a JSON string, not a raw object/array.
     const { errors } = await dataClient.models.SurveyRecord.create({
       patientName: patientName || 'Không rõ',
       birthYear: parseInt(birthYear || '0') || 0,
       address: address || '',
       gender: gender || 'nam',
-      answers: answers,
-      results: results,
+      answers: JSON.stringify(answers),
+      results: JSON.stringify(results),
       ownerEmail: user.email,
       ownerName: profile?.full_name || user.fullName || user.email,
     });
