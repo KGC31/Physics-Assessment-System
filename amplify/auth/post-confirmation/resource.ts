@@ -1,5 +1,5 @@
-import { defineFunction } from '@aws-amplify/backend';
+import { signInWithRedirect } from 'aws-amplify/auth';
 
-export const postConfirmation = defineFunction({
-  name: 'post-confirmation',
+await signInWithRedirect({
+  provider: 'Google',
 });
