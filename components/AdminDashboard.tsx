@@ -47,6 +47,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'user' | 'admin'>('user');
   const [inviteName, setInviteName] = useState('');
+  const [invitePassword, setInvitePassword] = useState('');
   const [inviteSaving, setInviteSaving] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
@@ -118,87 +119,84 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
 
   const handleAddInvite = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    setInviteSaving(true);
     setInviteError(null);
     setInviteSuccess(null);
 
-    const email = inviteEmail.trim().toLowerCase();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setInviteError('Email không hợp lệ.');
-      return;
-    }
+    try {
+      const email = inviteEmail.trim().toLowerCase();
 
-    setInviteSaving(true);
-
-    const existing = await dataClient.models.Profile.list({
-      filter: { email: { eq: email } },
-      limit: 10,
-    });
-    const already =
-      existing.data?.find((p) => p.email.toLowerCase() === email) ??
-      existing.data?.[0];
-
-    if (already) {
-      const { data, errors } = await dataClient.models.Profile.update({
-        id: already.id,
-        role: inviteRole,
-        fullName: inviteName.trim() || already.fullName || undefined,
-      });
-      setInviteSaving(false);
-      if (errors?.length || !data) {
-        setInviteError(errors?.map((err) => err.message).join(', ') || 'Không cập nhật được.');
-        return;
+      if (!email) {
+        throw new Error("Email không hợp lệ.");
       }
-      setUsers((prev) => {
-        const mapped = {
+
+      if (invitePassword.length < 8) {
+        throw new Error("Mật khẩu tối thiểu 8 ký tự.");
+      }
+
+      // 1. Tạo user trong Cognito
+      const response = await fetch("/api/admin/create-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password: invitePassword,
+          fullName: inviteName,
+          role: inviteRole,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message ?? "Không tạo được tài khoản.");
+      }
+
+      // 2. Tạo Profile
+      const { data, errors } =
+        await dataClient.models.Profile.create({
+          email,
+          fullName: inviteName || undefined,
+          role: inviteRole,
+        });
+
+      if (errors?.length || !data) {
+        throw new Error(
+          errors?.map((e) => e.message).join(", ") ??
+          "Không tạo được Profile."
+        );
+      }
+
+      setUsers((prev) => [
+        {
           id: data.id,
           email: data.email,
-          role: (data.role as 'admin' | 'user') ?? inviteRole,
+          role: (data.role as "admin" | "user") ?? inviteRole,
           full_name: data.fullName ?? null,
           created_at: data.createdAt ?? new Date().toISOString(),
           updated_at: data.updatedAt ?? new Date().toISOString(),
-        };
-        const without = prev.filter((u) => u.id !== data.id);
-        return [mapped, ...without];
-      });
-      setInviteSuccess(`Đã cập nhật quyền cho ${email} (${inviteRole}).`);
-      setInviteEmail('');
-      setInviteName('');
-      setInviteRole('user');
-      return;
-    }
+        },
+        ...prev,
+      ]);
 
-    const { data, errors } = await dataClient.models.Profile.create({
-      email,
-      role: inviteRole,
-      fullName: inviteName.trim() || undefined,
-    });
+      setInviteSuccess("Tạo tài khoản thành công.");
 
-    setInviteSaving(false);
+      setInviteEmail("");
+      setInvitePassword("");
+      setInviteName("");
+      setInviteRole("user");
 
-    if (errors?.length || !data) {
+      setShowAddForm(false);
+    } catch (err) {
       setInviteError(
-        errors?.map((err) => err.message).join(', ') ||
-          'Không thêm được. Kiểm tra quyền Cognito ADMIN.'
+        err instanceof Error ? err.message : "Có lỗi xảy ra."
       );
-      return;
+    } finally {
+      setInviteSaving(false);
     }
-
-    setUsers((prev) => [
-      {
-        id: data.id,
-        email: data.email,
-        role: (data.role as 'admin' | 'user') ?? inviteRole,
-        full_name: data.fullName ?? null,
-        created_at: data.createdAt ?? new Date().toISOString(),
-        updated_at: data.updatedAt ?? new Date().toISOString(),
-      },
-      ...prev,
-    ]);
-    setInviteSuccess(`Đã thêm ${email} với vai trò ${inviteRole}.`);
-    setInviteEmail('');
-    setInviteName('');
-    setInviteRole('user');
-    setShowAddForm(false);
   };
 
   const handleExportCSV = () => {
@@ -206,10 +204,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
       filterUserId === 'all'
         ? records
         : records.filter(
-            (r) =>
-              r.user_id === filterUserId ||
-              r.ownerEmail === users.find((u) => u.id === filterUserId)?.email
-          );
+          (r) =>
+            r.user_id === filterUserId ||
+            r.ownerEmail === users.find((u) => u.id === filterUserId)?.email
+        );
 
     if (filteredRecords.length === 0) return;
 
@@ -284,12 +282,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
     filterUserId === 'all'
       ? records
       : records.filter((r) => {
-          const u = users.find((x) => x.id === filterUserId);
-          return (
-            r.user_id === filterUserId ||
-            (u && (r.ownerEmail === u.email || r.user_id.includes(u.email)))
-          );
-        });
+        const u = users.find((x) => x.id === filterUserId);
+        return (
+          r.user_id === filterUserId ||
+          (u && (r.ownerEmail === u.email || r.user_id.includes(u.email)))
+        );
+      });
 
   const StatusBadge = ({ diagnosis }: { diagnosis: string }) => {
     switch (diagnosis) {
@@ -351,7 +349,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div className="sm:col-span-1">
               <label className="block text-xs font-semibold text-slate-500 mb-1.5">Email Google *</label>
               <input
@@ -360,6 +358,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="user@example.com"
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-violet-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+                Mật khẩu *
+              </label>
+
+              <input
+                type="password"
+                required
+                value={invitePassword}
+                onChange={(e) => setInvitePassword(e.target.value)}
+                placeholder="********"
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-violet-500"
               />
             </div>
@@ -409,7 +421,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
             disabled={inviteSaving}
             className="px-5 py-2.5 rounded-xl bg-violet-600 text-white font-bold hover:bg-violet-700 text-sm active:scale-95 disabled:opacity-60"
           >
-            {inviteSaving ? 'Đang lưu...' : 'Lưu email vào danh sách'}
+            {inviteSaving ? 'Đang tạo...' : 'Tạo tài khoản'}
           </button>
         </form>
       )}
@@ -423,21 +435,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
       <div className="flex gap-1 mb-8 bg-slate-100 p-1 rounded-xl w-fit">
         <button
           onClick={() => setTab('users')}
-          className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${
-            tab === 'users'
-              ? 'bg-white text-emerald-700 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
+          className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${tab === 'users'
+            ? 'bg-white text-emerald-700 shadow-sm'
+            : 'text-slate-500 hover:text-slate-700'
+            }`}
         >
           👥 Người dùng ({users.length})
         </button>
         <button
           onClick={() => setTab('records')}
-          className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${
-            tab === 'records'
-              ? 'bg-white text-emerald-700 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
+          className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${tab === 'records'
+            ? 'bg-white text-emerald-700 shadow-sm'
+            : 'text-slate-500 hover:text-slate-700'
+            }`}
         >
           📊 Bản ghi ({records.length})
         </button>
@@ -469,11 +479,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                         <td className="px-5 py-4 text-slate-600">{u.email}</td>
                         <td className="px-5 py-4">
                           <span
-                            className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                              u.role === 'admin'
-                                ? 'bg-violet-100 text-violet-700'
-                                : 'bg-slate-100 text-slate-600'
-                            }`}
+                            className={`px-2.5 py-1 rounded-full text-xs font-bold ${u.role === 'admin'
+                              ? 'bg-violet-100 text-violet-700'
+                              : 'bg-slate-100 text-slate-600'
+                              }`}
                           >
                             {u.role === 'admin' ? 'Admin' : 'User'}
                           </span>

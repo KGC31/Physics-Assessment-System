@@ -7,14 +7,19 @@ import React, {
   useEffect,
   useCallback,
 } from 'react';
+
 import {
+  signIn,
+  signOut as amplifySignOut,
+  resetPassword,
+  confirmResetPassword,
   getCurrentUser,
   fetchAuthSession,
   fetchUserAttributes,
-  signInWithRedirect,
-  signOut as amplifySignOut,
-} from 'aws-amplify/auth';
+} from "aws-amplify/auth";
+
 import { Hub } from 'aws-amplify/utils';
+
 import { dataClient } from '@/lib/amplifyClient';
 
 export interface AuthUser {
@@ -38,11 +43,27 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   isAdmin: boolean;
-  /** Set when Google SSO succeeds but email is not on the invite list. */
+
   authError: string | null;
   clearAuthError: () => void;
-  signInWithGoogle: () => Promise<{ error: string | null }>;
+
+  signIn: (
+    email: string,
+    password: string
+  ) => Promise<{ error: string | null }>;
+
   signOut: () => Promise<void>;
+
+  forgotPassword: (
+    email: string
+  ) => Promise<{ error: string | null }>;
+
+  confirmForgotPassword: (
+    email: string,
+    code: string,
+    newPassword: string
+  ) => Promise<{ error: string | null }>;
+
   refreshProfile: () => Promise<void>;
 }
 
@@ -51,7 +72,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const UNAUTHORIZED_MSG =
   'Email của bạn chưa được cấp quyền truy cập. Vui lòng liên hệ quản trị viên để được thêm vào hệ thống.';
 
-function normalizeEmail(email: string): string {
+function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
@@ -76,33 +97,37 @@ function mapProfile(data: {
 function getGroupsFromSession(
   session: Awaited<ReturnType<typeof fetchAuthSession>>
 ): string[] {
-  const claim = session.tokens?.accessToken?.payload['cognito:groups'];
-  if (Array.isArray(claim)) return claim.map(String);
-  return [];
+  const groups = session.tokens?.accessToken?.payload['cognito:groups'];
+
+  return Array.isArray(groups) ? groups.map(String) : [];
 }
 
-async function findProfileByEmail(email: string): Promise<Profile | null> {
+async function findProfileByEmail(
+  email: string
+): Promise<Profile | null> {
   const normalized = normalizeEmail(email);
-  const { data, errors } = await dataClient.models.Profile.list({
-    filter: { email: { eq: normalized } },
-    limit: 50,
-  });
+
+  const { data, errors } =
+    await dataClient.models.Profile.list({
+      filter: {
+        email: {
+          eq: normalized,
+        },
+      },
+      limit: 1,
+    });
 
   if (errors?.length) {
-    // Fallback: some records may have been stored with original casing.
-    const all = await dataClient.models.Profile.list({ limit: 500 });
-    const match = all.data?.find(
-      (p) => normalizeEmail(p.email) === normalized
-    );
-    return match ? mapProfile(match) : null;
+    return null;
   }
 
-  const exact =
-    data?.find((p) => normalizeEmail(p.email) === normalized) ?? data?.[0];
-  return exact ? mapProfile(exact) : null;
+  if (!data?.length) {
+    return null;
+  }
+
+  return mapProfile(data[0]);
 }
 
-/** Bootstrap only: Cognito ADMIN with no Profile row yet. */
 async function createBootstrapAdminProfile(
   email: string,
   fullName: string | null
@@ -112,6 +137,7 @@ async function createBootstrapAdminProfile(
     fullName: fullName ?? undefined,
     role: 'admin',
   });
+
   return data ? mapProfile(data) : null;
 }
 
@@ -119,84 +145,104 @@ async function touchProfileName(
   profile: Profile,
   fullName: string | null
 ): Promise<Profile> {
-  if (!fullName || fullName === profile.full_name) return profile;
+  if (!fullName || profile.full_name === fullName) {
+    return profile;
+  }
+
   try {
     const { data } = await dataClient.models.Profile.update({
       id: profile.id,
       fullName,
     });
+
     return data ? mapProfile(data) : profile;
   } catch {
     return profile;
   }
 }
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const clearAuthError = useCallback(() => setAuthError(null), []);
+  const clearAuthError = useCallback(() => {
+    setAuthError(null);
+  }, []);
 
   const denyAndSignOut = useCallback(async (message: string) => {
     setAuthError(message);
+
     setUser(null);
     setProfile(null);
     setIsAdmin(false);
+
     try {
       await amplifySignOut({ global: true });
-    } catch {
-      // Ignore sign-out errors when session is already invalid.
-    }
+    } catch { }
   }, []);
 
   const loadSession = useCallback(async () => {
     try {
-      const current = await getCurrentUser();
+      const currentUser = await getCurrentUser();
+
       const session = await fetchAuthSession();
-      const attrs = await fetchUserAttributes();
+
+      const attributes = await fetchUserAttributes();
+
       const groups = getGroupsFromSession(session);
+
       const cognitoAdmin = groups.includes('ADMIN');
 
-      const email = attrs.email ?? '';
+      const email = attributes.email ?? '';
+
       if (!email) {
         await denyAndSignOut(UNAUTHORIZED_MSG);
         return;
       }
 
       const fullName =
-        [attrs.given_name, attrs.family_name].filter(Boolean).join(' ') ||
-        attrs.name ||
+        attributes.name ??
         null;
 
-      let p = await findProfileByEmail(email);
+      let profile = await findProfileByEmail(email);
 
-      if (!p) {
-        // First Cognito ADMIN can bootstrap their own whitelist row.
+      if (!profile) {
         if (cognitoAdmin) {
-          p = await createBootstrapAdminProfile(email, fullName);
+          profile = await createBootstrapAdminProfile(
+            email,
+            fullName
+          );
         }
-        if (!p) {
+
+        if (!profile) {
           await denyAndSignOut(UNAUTHORIZED_MSG);
           return;
         }
       }
 
-      p = await touchProfileName(p, fullName);
+      profile = await touchProfileName(profile, fullName);
 
-      const authUser: AuthUser = {
-        userId: current.userId,
-        username: current.username,
+      setUser({
+        userId: currentUser.userId,
+        username: currentUser.username,
         email: normalizeEmail(email),
         fullName,
-      };
+      });
+
+      setProfile(profile);
+
+      setIsAdmin(
+        cognitoAdmin || profile.role === 'admin'
+      );
 
       setAuthError(null);
-      setUser(authUser);
-      setProfile(p);
-      setIsAdmin(p.role === 'admin' || cognitoAdmin);
     } catch {
       setUser(null);
       setProfile(null);
@@ -207,46 +253,128 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [denyAndSignOut]);
 
   const refreshProfile = useCallback(async () => {
+    setLoading(true);
     await loadSession();
   }, [loadSession]);
 
   useEffect(() => {
+
     loadSession();
 
-    const unsubscribe = Hub.listen('auth', ({ payload }) => {
+    const unsubscribe = Hub.listen("auth", ({ payload }) => {
       switch (payload.event) {
-        case 'signedIn':
-        case 'signInWithRedirect':
+        case "signedIn":
           setLoading(true);
           loadSession();
           break;
-        case 'signedOut':
+
+        case "signedOut":
           setUser(null);
           setProfile(null);
           setIsAdmin(false);
           setLoading(false);
           break;
-        default:
-          break;
       }
     });
 
-    return () => unsubscribe();
+    return unsubscribe;
+
   }, [loadSession]);
 
-  const signInWithGoogle = async () => {
+  const signInUser = async (
+    email: string,
+    password: string
+  ) => {
     try {
       setAuthError(null);
-      await signInWithRedirect({ provider: 'Google' });
-      return { error: null };
+
+      const result = await signIn({
+        username: normalizeEmail(email),
+        password,
+      });
+
+      if (!result.isSignedIn) {
+        return {
+          error: "Đăng nhập thất bại.",
+        };
+      }
+
+      await loadSession();
+
+      return {
+        error: null,
+      };
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Đăng nhập Google thất bại';
-      return { error: message };
+      return {
+        error:
+          err instanceof Error
+            ? err.message
+            : "Đăng nhập thất bại.",
+      };
+    }
+  };
+
+  const forgotPassword = async (
+    email: string
+  ) => {
+    try {
+
+      await resetPassword({
+        username: normalizeEmail(email),
+      });
+
+      return {
+        error: null,
+      };
+
+    } catch (err) {
+
+      return {
+        error:
+          err instanceof Error
+            ? err.message
+            : "Không gửi được mã xác nhận.",
+      };
+    }
+  };
+
+  const confirmForgotPassword = async (
+    email: string,
+    code: string,
+    newPassword: string
+  ) => {
+
+    try {
+
+      await confirmResetPassword({
+
+        username: normalizeEmail(email),
+
+        confirmationCode: code,
+
+        newPassword,
+      });
+
+      return {
+        error: null,
+      };
+
+    } catch (err) {
+
+      return {
+        error:
+          err instanceof Error
+            ? err.message
+            : "Đổi mật khẩu thất bại.",
+      };
     }
   };
 
   const signOut = async () => {
-    await amplifySignOut({ global: true });
+    await amplifySignOut({
+      global: true,
+    });
+
     setUser(null);
     setProfile(null);
     setIsAdmin(false);
@@ -259,10 +387,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profile,
         loading,
         isAdmin,
+
         authError,
+
         clearAuthError,
-        signInWithGoogle,
+
+        signIn: signInUser,
+
         signOut,
+
+        forgotPassword,
+
+        confirmForgotPassword,
+
         refreshProfile,
       }}
     >
@@ -272,7 +409,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error(
+      'useAuth must be used within AuthProvider'
+    );
+  }
+
+  return context;
 }

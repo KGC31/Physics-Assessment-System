@@ -211,12 +211,7 @@ export default function App() {
               {/* Auth-related buttons */}
               <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
                 {!user ? (
-                  <button
-                    onClick={() => setStep('login')}
-                    className="px-6 py-3 rounded-xl border-2 border-emerald-200 text-emerald-700 font-bold hover:bg-emerald-50 transition-colors text-sm active:scale-95"
-                  >
-                    Đăng nhập với Google
-                  </button>
+                  <></>
                 ) : (
                   <>
                     <button
@@ -262,7 +257,6 @@ export default function App() {
             >
               <LoginPage
                 onBack={handleReset}
-                message="Chỉ tài khoản đã được admin thêm email mới đăng nhập được. Đăng nhập bằng Google SSO."
               />
             </motion.div>
           )}
