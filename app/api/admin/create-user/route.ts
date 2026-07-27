@@ -31,6 +31,13 @@ export async function POST(req: Request) {
 
         const userPoolId = process.env.COGNITO_USER_POOL_ID || process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID;
 
+        console.log('create-user route env: COGNITO_USER_POOL_ID=', process.env.COGNITO_USER_POOL_ID);
+        console.log('create-user route env: NEXT_PUBLIC_COGNITO_USER_POOL_ID=', process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID);
+        console.log('create-user route env: APP_REGION=', process.env.APP_REGION);
+        console.log('create-user route env: AWS_REGION=', process.env.AWS_REGION);
+        console.log('create-user route env: APP_ACCESS_KEY_ID=', !!process.env.APP_ACCESS_KEY_ID);
+        console.log('create-user route env: APP_SECRET_ACCESS_KEY=', !!process.env.APP_SECRET_ACCESS_KEY);
+
         if (!userPoolId) {
             return NextResponse.json(
                 {
