@@ -135,7 +135,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
         throw new Error("Mật khẩu tối thiểu 8 ký tự.");
       }
 
-      // 1. Tạo user trong Cognito thông qua mutation và Amplify Function
+      // 1. Tạo user trong Cognito thông qua AppSync mutation và Amplify Function
       await dataClient.mutations.createUser({
         email,
         password: invitePassword,

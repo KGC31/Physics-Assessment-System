@@ -1,6 +1,7 @@
 'use client';
 
-import { Amplify } from 'aws-amplify';
+import { Amplify } from '@aws-amplify/core';
+import { GraphQLAPI, graphqlOperation } from '@aws-amplify/api-graphql';
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '@/amplify/data/resource';
 import outputs from '@/amplify_outputs.json';
@@ -16,19 +17,30 @@ type CreateUserInput = {
   role: 'user' | 'admin';
 };
 
+const createUserMutation = `
+  mutation CreateAdminUser($email: String!, $password: String!, $fullName: String, $role: String!) {
+    createUser(email: $email, password: $password, fullName: $fullName, role: $role) {
+      success
+      message
+    }
+  }
+`;
+
 async function createUser(input: CreateUserInput) {
-  const response = await fetch('/api/admin/create-user', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(input),
-  });
+  const response = await GraphQLAPI.graphql(
+    Amplify,
+    graphqlOperation(createUserMutation, {
+      email: input.email,
+      password: input.password,
+      fullName: input.fullName,
+      role: input.role,
+    })
+  ) as any;
 
-  const result = await response.json();
+  const result = response?.data?.createUser;
 
-  if (!response.ok || !result.success) {
-    throw new Error(result.message ?? 'Không tạo được tài khoản.');
+  if (!result?.success) {
+    throw new Error(result?.message ?? 'Không tạo được tài khoản.');
   }
 
   return result;
