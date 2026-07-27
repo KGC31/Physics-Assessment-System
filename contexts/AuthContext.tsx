@@ -6,6 +6,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from 'react';
 
 import {
@@ -16,7 +17,7 @@ import {
   getCurrentUser,
   fetchAuthSession,
   fetchUserAttributes,
-} from "aws-amplify/auth";
+} from 'aws-amplify/auth';
 
 import { Hub } from 'aws-amplify/utils';
 
@@ -43,27 +44,16 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   isAdmin: boolean;
-
   authError: string | null;
   clearAuthError: () => void;
-
-  signIn: (
-    email: string,
-    password: string
-  ) => Promise<{ error: string | null }>;
-
+  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
-
-  forgotPassword: (
-    email: string
-  ) => Promise<{ error: string | null }>;
-
+  forgotPassword: (email: string) => Promise<{ error: string | null }>;
   confirmForgotPassword: (
     email: string,
     code: string,
     newPassword: string
   ) => Promise<{ error: string | null }>;
-
   refreshProfile: () => Promise<void>;
 }
 
@@ -77,16 +67,17 @@ function normalizeEmail(email: string) {
 }
 
 function mapProfile(data: {
-  id: string;
   email: string;
   role?: string | null;
   fullName?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 }): Profile {
+  const email = normalizeEmail(data.email);
   return {
-    id: data.id,
-    email: data.email,
+    // email is the Profile primary key (.identifier(['email']))
+    id: email,
+    email,
     role: (data.role as 'admin' | 'user') ?? 'user',
     full_name: data.fullName ?? null,
     created_at: data.createdAt ?? new Date().toISOString(),
@@ -98,47 +89,48 @@ function getGroupsFromSession(
   session: Awaited<ReturnType<typeof fetchAuthSession>>
 ): string[] {
   const groups = session.tokens?.accessToken?.payload['cognito:groups'];
-
   return Array.isArray(groups) ? groups.map(String) : [];
 }
 
-async function findProfileByEmail(
-  email: string
-): Promise<Profile | null> {
+async function findProfileByEmail(email: string): Promise<Profile | null> {
   const normalized = normalizeEmail(email);
 
-  const { data, errors } =
-    await dataClient.models.Profile.list({
-      filter: {
-        email: {
-          eq: normalized,
-        },
-      },
-      limit: 1,
-    });
-
-  if (errors?.length) {
-    return null;
+  // Primary key lookup — email is unique.
+  const byId = await dataClient.models.Profile.get({ email: normalized });
+  if (byId.data) {
+    return mapProfile(byId.data);
   }
 
-  if (!data?.length) {
-    return null;
-  }
-
-  return mapProfile(data[0]);
+  // Fallback for mixed casing from older deployments.
+  const all = await dataClient.models.Profile.list({ limit: 500 });
+  const match = all.data?.find((p) => normalizeEmail(p.email) === normalized);
+  return match ? mapProfile(match) : null;
 }
 
-async function createBootstrapAdminProfile(
+/**
+ * First Cognito ADMIN only: create Profile if missing.
+ * Re-checks immediately before create to avoid duplicate rows.
+ */
+async function ensureBootstrapAdminProfile(
   email: string,
   fullName: string | null
 ): Promise<Profile | null> {
-  const { data } = await dataClient.models.Profile.create({
-    email: normalizeEmail(email),
+  const normalized = normalizeEmail(email);
+  const existing = await findProfileByEmail(normalized);
+  if (existing) return existing;
+
+  const { data, errors } = await dataClient.models.Profile.create({
+    email: normalized,
     fullName: fullName ?? undefined,
     role: 'admin',
   });
 
-  return data ? mapProfile(data) : null;
+  if (errors?.length || !data) {
+    // Another concurrent login may have created it — re-read.
+    return findProfileByEmail(normalized);
+  }
+
+  return mapProfile(data);
 }
 
 async function touchProfileName(
@@ -151,26 +143,24 @@ async function touchProfileName(
 
   try {
     const { data } = await dataClient.models.Profile.update({
-      id: profile.id,
+      email: profile.email,
       fullName,
     });
-
     return data ? mapProfile(data) : profile;
   } catch {
     return profile;
   }
 }
 
-export function AuthProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  // Serialize loadSession so Hub "signedIn" + signIn() don't race-create Profiles.
+  const loadSessionInflight = useRef<Promise<void> | null>(null);
 
   const clearAuthError = useCallback(() => {
     setAuthError(null);
@@ -178,78 +168,72 @@ export function AuthProvider({
 
   const denyAndSignOut = useCallback(async (message: string) => {
     setAuthError(message);
-
     setUser(null);
     setProfile(null);
     setIsAdmin(false);
-
     try {
       await amplifySignOut({ global: true });
-    } catch { }
+    } catch {
+      // ignore
+    }
   }, []);
 
   const loadSession = useCallback(async () => {
-    try {
-      const currentUser = await getCurrentUser();
+    if (loadSessionInflight.current) {
+      return loadSessionInflight.current;
+    }
 
-      const session = await fetchAuthSession();
+    const run = (async () => {
+      try {
+        const currentUser = await getCurrentUser();
+        const session = await fetchAuthSession();
+        const attributes = await fetchUserAttributes();
+        const groups = getGroupsFromSession(session);
+        const cognitoAdmin = groups.includes('ADMIN');
 
-      const attributes = await fetchUserAttributes();
-
-      const groups = getGroupsFromSession(session);
-
-      const cognitoAdmin = groups.includes('ADMIN');
-
-      const email = attributes.email ?? '';
-
-      if (!email) {
-        await denyAndSignOut(UNAUTHORIZED_MSG);
-        return;
-      }
-
-      const fullName =
-        attributes.name ??
-        null;
-
-      let profile = await findProfileByEmail(email);
-
-      if (!profile) {
-        if (cognitoAdmin) {
-          profile = await createBootstrapAdminProfile(
-            email,
-            fullName
-          );
-        }
-
-        if (!profile) {
+        const email = attributes.email ?? '';
+        if (!email) {
           await denyAndSignOut(UNAUTHORIZED_MSG);
           return;
         }
+
+        const fullName = attributes.name ?? null;
+        let nextProfile = await findProfileByEmail(email);
+
+        if (!nextProfile) {
+          // Only first Cognito ADMIN may bootstrap; never create for normal users.
+          if (cognitoAdmin) {
+            nextProfile = await ensureBootstrapAdminProfile(email, fullName);
+          }
+          if (!nextProfile) {
+            await denyAndSignOut(UNAUTHORIZED_MSG);
+            return;
+          }
+        }
+
+        nextProfile = await touchProfileName(nextProfile, fullName);
+
+        setUser({
+          userId: currentUser.userId,
+          username: currentUser.username,
+          email: normalizeEmail(email),
+          fullName,
+        });
+        setProfile(nextProfile);
+        setIsAdmin(cognitoAdmin || nextProfile.role === 'admin');
+        setAuthError(null);
+      } catch {
+        setUser(null);
+        setProfile(null);
+        setIsAdmin(false);
+      } finally {
+        setLoading(false);
+        loadSessionInflight.current = null;
       }
+    })();
 
-      profile = await touchProfileName(profile, fullName);
-
-      setUser({
-        userId: currentUser.userId,
-        username: currentUser.username,
-        email: normalizeEmail(email),
-        fullName,
-      });
-
-      setProfile(profile);
-
-      setIsAdmin(
-        cognitoAdmin || profile.role === 'admin'
-      );
-
-      setAuthError(null);
-    } catch {
-      setUser(null);
-      setProfile(null);
-      setIsAdmin(false);
-    } finally {
-      setLoading(false);
-    }
+    loadSessionInflight.current = run;
+    return run;
   }, [denyAndSignOut]);
 
   const refreshProfile = useCallback(async () => {
@@ -258,33 +242,30 @@ export function AuthProvider({
   }, [loadSession]);
 
   useEffect(() => {
-
     loadSession();
 
-    const unsubscribe = Hub.listen("auth", ({ payload }) => {
+    const unsubscribe = Hub.listen('auth', ({ payload }) => {
       switch (payload.event) {
-        case "signedIn":
+        case 'signedIn':
+          // signIn() already awaits loadSession — Hub just shares the same inflight promise.
           setLoading(true);
-          loadSession();
+          void loadSession();
           break;
-
-        case "signedOut":
+        case 'signedOut':
           setUser(null);
           setProfile(null);
           setIsAdmin(false);
           setLoading(false);
           break;
+        default:
+          break;
       }
     });
 
     return unsubscribe;
-
   }, [loadSession]);
 
-  const signInUser = async (
-    email: string,
-    password: string
-  ) => {
+  const signInUser = async (email: string, password: string) => {
     try {
       setAuthError(null);
 
@@ -294,14 +275,15 @@ export function AuthProvider({
       });
 
       if (result.isSignedIn) {
+        setLoading(true);
         await loadSession();
         return { error: null };
       }
 
-      // AdminSetUserPassword(Permanent: true) should avoid this, but surface clearly if it appears.
       if (result.nextStep?.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
         return {
-          error: 'Tài khoản cần đổi mật khẩu tạm. Liên hệ admin để đặt lại mật khẩu cố định.',
+          error:
+            'Tài khoản cần đổi mật khẩu tạm. Liên hệ admin để đặt lại mật khẩu cố định.',
         };
       }
 
@@ -310,34 +292,19 @@ export function AuthProvider({
       };
     } catch (err) {
       return {
-        error:
-          err instanceof Error
-            ? err.message
-            : 'Đăng nhập thất bại.',
+        error: err instanceof Error ? err.message : 'Đăng nhập thất bại.',
       };
     }
   };
 
-  const forgotPassword = async (
-    email: string
-  ) => {
+  const forgotPassword = async (email: string) => {
     try {
-
-      await resetPassword({
-        username: normalizeEmail(email),
-      });
-
-      return {
-        error: null,
-      };
-
+      await resetPassword({ username: normalizeEmail(email) });
+      return { error: null };
     } catch (err) {
-
       return {
         error:
-          err instanceof Error
-            ? err.message
-            : "Không gửi được mã xác nhận.",
+          err instanceof Error ? err.message : 'Không gửi được mã xác nhận.',
       };
     }
   };
@@ -347,38 +314,22 @@ export function AuthProvider({
     code: string,
     newPassword: string
   ) => {
-
     try {
-
       await confirmResetPassword({
-
         username: normalizeEmail(email),
-
         confirmationCode: code,
-
         newPassword,
       });
-
-      return {
-        error: null,
-      };
-
+      return { error: null };
     } catch (err) {
-
       return {
-        error:
-          err instanceof Error
-            ? err.message
-            : "Đổi mật khẩu thất bại.",
+        error: err instanceof Error ? err.message : 'Đổi mật khẩu thất bại.',
       };
     }
   };
 
   const signOut = async () => {
-    await amplifySignOut({
-      global: true,
-    });
-
+    await amplifySignOut({ global: true });
     setUser(null);
     setProfile(null);
     setIsAdmin(false);
@@ -391,19 +342,12 @@ export function AuthProvider({
         profile,
         loading,
         isAdmin,
-
         authError,
-
         clearAuthError,
-
         signIn: signInUser,
-
         signOut,
-
         forgotPassword,
-
         confirmForgotPassword,
-
         refreshProfile,
       }}
     >
@@ -414,12 +358,8 @@ export function AuthProvider({
 
 export function useAuth() {
   const context = useContext(AuthContext);
-
   if (!context) {
-    throw new Error(
-      'useAuth must be used within AuthProvider'
-    );
+    throw new Error('useAuth must be used within AuthProvider');
   }
-
   return context;
 }

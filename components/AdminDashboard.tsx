@@ -61,16 +61,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
     setLoading(true);
     const { data, errors } = await dataClient.models.Profile.list({ limit: 500 });
     if (!errors && data) {
-      setUsers(
-        data.map((p) => ({
-          id: p.id,
-          email: p.email,
+      // email is the unique primary key — normalize for display.
+      const byEmail = new Map<
+        string,
+        {
+          id: string;
+          email: string;
+          role: 'admin' | 'user';
+          full_name: string | null;
+          created_at: string;
+          updated_at: string;
+        }
+      >();
+
+      for (const p of data) {
+        const email = p.email.trim().toLowerCase();
+        byEmail.set(email, {
+          id: email,
+          email,
           role: (p.role as 'admin' | 'user') ?? 'user',
           full_name: p.fullName ?? null,
           created_at: p.createdAt ?? new Date().toISOString(),
           updated_at: p.updatedAt ?? new Date().toISOString(),
-        }))
-      );
+        });
+      }
+
+      setUsers(Array.from(byEmail.values()));
     }
     setLoading(false);
   };
@@ -96,15 +112,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    if (userId === user?.userId) {
+  const handleDeleteUser = async (email: string) => {
+    const normalized = email.trim().toLowerCase();
+
+    if (normalized === user?.email?.toLowerCase()) {
       setDeleteConfirm(null);
       return;
     }
 
-    const { errors } = await dataClient.models.Profile.delete({ id: userId });
-    if (!errors) {
-      setUsers((prev) => prev.filter((u) => u.id !== userId));
+    try {
+      // 1. Delete Cognito user
+      const { data: deleteResult, errors: deleteErrors } =
+        await dataClient.mutations.deleteUser({ email: normalized });
+
+      if (deleteErrors?.length) {
+        throw new Error(deleteErrors.map((e) => e.message).join(', '));
+      }
+      if (!deleteResult?.success) {
+        throw new Error(
+          deleteResult?.message ?? 'Không xóa được tài khoản Cognito.'
+        );
+      }
+
+      // 2. Delete Profile (email is PK)
+      const { errors } = await dataClient.models.Profile.delete({
+        email: normalized,
+      });
+
+      if (errors?.length) {
+        throw new Error(errors.map((e) => e.message).join(', '));
+      }
+
+      setUsers((prev) => prev.filter((u) => u.email.toLowerCase() !== normalized));
+      setDeleteConfirm(null);
+    } catch (err) {
+      console.error('Delete user failed:', err);
+      setInviteError(err instanceof Error ? err.message : 'Xóa người dùng thất bại.');
       setDeleteConfirm(null);
     }
   };
@@ -152,21 +195,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
         throw new Error(createResult?.message ?? 'Không tạo được tài khoản Cognito.');
       }
 
-      // 2. Upsert Profile whitelist / role record.
-      const existing = await dataClient.models.Profile.list({
-        filter: { email: { eq: email } },
-        limit: 10,
-      });
-      const already =
-        existing.data?.find((p) => p.email.toLowerCase() === email) ??
-        existing.data?.[0];
+      // 2. Upsert Profile (email is unique primary key).
+      const existing = await dataClient.models.Profile.get({ email });
 
       let profileData;
-      if (already) {
+      if (existing.data) {
         const { data, errors } = await dataClient.models.Profile.update({
-          id: already.id,
+          email,
           role: inviteRole,
-          fullName: fullName || already.fullName || undefined,
+          fullName: fullName || existing.data.fullName || undefined,
         });
         if (errors?.length || !data) {
           throw new Error(
@@ -184,22 +221,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
         if (errors?.length || !data) {
           throw new Error(
             errors?.map((err) => err.message).join(', ') ??
-              'Cognito đã tạo nhưng không tạo được Profile.'
+              'Cognito đã tạo nhưng không tạo được Profile (email có thể đã tồn tại).'
           );
         }
         profileData = data;
       }
 
+      const mappedEmail = profileData.email.trim().toLowerCase();
       const mapped = {
-        id: profileData.id,
-        email: profileData.email,
+        id: mappedEmail,
+        email: mappedEmail,
         role: (profileData.role as 'admin' | 'user') ?? inviteRole,
         full_name: profileData.fullName ?? null,
         created_at: profileData.createdAt ?? new Date().toISOString(),
         updated_at: profileData.updatedAt ?? new Date().toISOString(),
       };
 
-      setUsers((prev) => [mapped, ...prev.filter((u) => u.id !== mapped.id)]);
+      setUsers((prev) => [
+        mapped,
+        ...prev.filter((u) => u.email.toLowerCase() !== mappedEmail),
+      ]);
 
       setInviteSuccess(
         `Đã tạo tài khoản ${email} (Cognito email/password · ${inviteRole}).`
@@ -504,12 +545,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                           {new Date(u.created_at).toLocaleDateString('vi-VN')}
                         </td>
                         <td className="px-5 py-4 text-right">
-                          {u.id === user?.userId || u.email === user?.email ? (
+                          {u.email.toLowerCase() === user?.email?.toLowerCase() ? (
                             <span className="text-xs text-slate-400 italic">Bạn</span>
-                          ) : deleteConfirm === u.id ? (
+                          ) : deleteConfirm === u.email ? (
                             <div className="flex items-center justify-end gap-2">
                               <button
-                                onClick={() => handleDeleteUser(u.id)}
+                                onClick={() => handleDeleteUser(u.email)}
                                 className="px-3 py-1 rounded-lg bg-rose-600 text-white text-xs font-bold hover:bg-rose-700"
                               >
                                 Xác nhận
@@ -523,10 +564,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                             </div>
                           ) : (
                             <button
-                              onClick={() => setDeleteConfirm(u.id)}
+                              onClick={() => setDeleteConfirm(u.email)}
                               className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                             >
-                              Xóa hồ sơ
+                              Xóa tài khoản
                             </button>
                           )}
                         </td>

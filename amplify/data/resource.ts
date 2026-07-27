@@ -1,9 +1,10 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
 import { createUserFunction } from '../functions/create-user/resource';
+import { deleteUserFunction } from '../functions/delete-user/resource';
 
 /**
  * Survey + profile storage: Amplify Data (AppSync + DynamoDB).
- * Users are created by admins (Cognito email/password) then mirrored in Profile.
+ * Profile.email is the primary key (unique). Users are admin-created in Cognito.
  */
 const schema = a.schema({
   Profile: a
@@ -12,6 +13,7 @@ const schema = a.schema({
       fullName: a.string(),
       role: a.enum(['user', 'admin']),
     })
+    .identifier(['email'])
     .authorization((allow) => [
       allow.group('ADMIN').to(['create', 'read', 'update', 'delete']),
       allow.authenticated().to(['read']),
@@ -39,6 +41,11 @@ const schema = a.schema({
     message: a.string(),
   }),
 
+  DeleteUserResult: a.customType({
+    success: a.boolean().required(),
+    message: a.string(),
+  }),
+
   createUser: a
     .mutation()
     .arguments({
@@ -50,6 +57,15 @@ const schema = a.schema({
     .returns(a.ref('CreateUserResult'))
     .authorization((allow) => [allow.group('ADMIN')])
     .handler(a.handler.function(createUserFunction)),
+
+  deleteUser: a
+    .mutation()
+    .arguments({
+      email: a.email().required(),
+    })
+    .returns(a.ref('DeleteUserResult'))
+    .authorization((allow) => [allow.group('ADMIN')])
+    .handler(a.handler.function(deleteUserFunction)),
 });
 
 export type Schema = ClientSchema<typeof schema>;

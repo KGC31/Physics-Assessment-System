@@ -3,6 +3,7 @@ import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { createUserFunction } from './functions/create-user/resource';
+import { deleteUserFunction } from './functions/delete-user/resource';
 
 /**
  * Amplify Gen2 backend.
@@ -13,6 +14,7 @@ const backend = defineBackend({
   auth,
   data,
   createUserFunction,
+  deleteUserFunction,
 });
 
 // Disable public self sign-up; admins create users via createUser mutation.
@@ -23,7 +25,6 @@ cfnUserPool.adminCreateUserConfig = {
 
 const userPool = backend.auth.resources.userPool;
 
-// Amplify Function factory API (not IFunction / Lambda L2).
 backend.createUserFunction.addEnvironment(
   'COGNITO_USER_POOL_ID',
   userPool.userPoolId
@@ -36,6 +37,18 @@ backend.createUserFunction.resources.lambda.addToRolePolicy(
       'cognito-idp:AdminSetUserPassword',
       'cognito-idp:AdminAddUserToGroup',
     ],
+    resources: [userPool.userPoolArn],
+  })
+);
+
+backend.deleteUserFunction.addEnvironment(
+  'COGNITO_USER_POOL_ID',
+  userPool.userPoolId
+);
+
+backend.deleteUserFunction.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['cognito-idp:AdminDeleteUser'],
     resources: [userPool.userPoolArn],
   })
 );
