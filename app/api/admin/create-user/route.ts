@@ -7,13 +7,18 @@ import {
     AdminAddUserToGroupCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 
-const cognito = new CognitoIdentityProviderClient({
-    region: process.env.APP_REGION,
-    credentials: {
-        accessKeyId: process.env.APP_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.APP_SECRET_ACCESS_KEY!,
-    },
-});
+const cognitoConfig: any = {
+    region: process.env.APP_REGION || process.env.AWS_REGION,
+};
+
+if (process.env.APP_ACCESS_KEY_ID && process.env.APP_SECRET_ACCESS_KEY) {
+    cognitoConfig.credentials = {
+        accessKeyId: process.env.APP_ACCESS_KEY_ID,
+        secretAccessKey: process.env.APP_SECRET_ACCESS_KEY,
+    };
+}
+
+const cognito = new CognitoIdentityProviderClient(cognitoConfig);
 
 export async function POST(req: Request) {
     try {
@@ -24,7 +29,27 @@ export async function POST(req: Request) {
             role,
         } = await req.json();
 
-        const userPoolId = process.env.COGNITO_USER_POOL_ID!;
+        const userPoolId = process.env.COGNITO_USER_POOL_ID || process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID;
+
+        if (!userPoolId) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: 'Missing Cognito user pool ID in environment variables.',
+                },
+                { status: 500 }
+            );
+        }
+
+        if (!cognitoConfig.region) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: 'Missing AWS region in environment variables.',
+                },
+                { status: 500 }
+            );
+        }
 
         await cognito.send(
             new AdminCreateUserCommand({

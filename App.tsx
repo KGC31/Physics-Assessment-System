@@ -48,6 +48,10 @@ export default function App() {
     if (!authLoading && authError && !user && step === 'landing') {
       setStep('login');
     }
+
+    if (!authLoading && user && step === 'login') {
+      setStep('landing');
+    }
   }, [authLoading, authError, user, step]);
 
   const handleStart = () => {

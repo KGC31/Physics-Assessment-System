@@ -135,25 +135,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
         throw new Error("Mật khẩu tối thiểu 8 ký tự.");
       }
 
-      // 1. Tạo user trong Cognito
-      const response = await fetch("/api/admin/create-user", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          password: invitePassword,
-          fullName: inviteName,
-          role: inviteRole,
-        }),
+      // 1. Tạo user trong Cognito thông qua mutation và Amplify Function
+      await dataClient.mutations.createUser({
+        email,
+        password: invitePassword,
+        fullName: inviteName,
+        role: inviteRole,
       });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message ?? "Không tạo được tài khoản.");
-      }
 
       // 2. Tạo Profile
       const { data, errors } =
