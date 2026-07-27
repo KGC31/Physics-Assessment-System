@@ -3,40 +3,64 @@ import {
   AdminCreateUserCommand,
   AdminSetUserPasswordCommand,
   AdminAddUserToGroupCommand,
+  UsernameExistsException,
 } from '@aws-sdk/client-cognito-identity-provider';
 
-const region = process.env.APP_REGION || process.env.AWS_REGION;
-const userPoolId = process.env.COGNITO_USER_POOL_ID;
+const cognito = new CognitoIdentityProviderClient();
 
-const cognito = new CognitoIdentityProviderClient({ region });
+type CreateUserEvent = {
+  arguments: {
+    email: string;
+    password: string;
+    fullName?: string | null;
+    role?: 'user' | 'admin' | null;
+  };
+};
 
-async function createCognitoUser({ email, password, fullName, role }: {
+async function createCognitoUser({
+  email,
+  password,
+  fullName,
+  role,
+}: {
   email: string;
   password: string;
   fullName?: string;
   role: 'user' | 'admin';
 }) {
+  const userPoolId = process.env.COGNITO_USER_POOL_ID;
   if (!userPoolId) {
-    throw new Error('Missing Cognito user pool ID in function environment.');
+    throw new Error('Missing COGNITO_USER_POOL_ID in function environment.');
   }
 
-  await cognito.send(
-    new AdminCreateUserCommand({
-      UserPoolId: userPoolId,
-      Username: email.toLowerCase(),
-      MessageAction: 'SUPPRESS',
-      UserAttributes: [
-        { Name: 'email', Value: email.toLowerCase() },
-        { Name: 'email_verified', Value: 'true' },
-        { Name: 'name', Value: fullName ?? '' },
-      ],
-    })
-  );
+  const username = email.toLowerCase();
+  const groupName = role === 'admin' ? 'ADMIN' : 'USER';
+
+  try {
+    await cognito.send(
+      new AdminCreateUserCommand({
+        UserPoolId: userPoolId,
+        Username: username,
+        MessageAction: 'SUPPRESS',
+        TemporaryPassword: password,
+        UserAttributes: [
+          { Name: 'email', Value: username },
+          { Name: 'email_verified', Value: 'true' },
+          ...(fullName ? [{ Name: 'name', Value: fullName }] : []),
+        ],
+      })
+    );
+  } catch (err) {
+    if (!(err instanceof UsernameExistsException)) {
+      throw err;
+    }
+    // User already exists — still refresh password + group below.
+  }
 
   await cognito.send(
     new AdminSetUserPasswordCommand({
       UserPoolId: userPoolId,
-      Username: email.toLowerCase(),
+      Username: username,
       Password: password,
       Permanent: true,
     })
@@ -45,37 +69,39 @@ async function createCognitoUser({ email, password, fullName, role }: {
   await cognito.send(
     new AdminAddUserToGroupCommand({
       UserPoolId: userPoolId,
-      Username: email.toLowerCase(),
-      GroupName: role === 'admin' ? 'ADMIN' : 'USER',
+      Username: username,
+      GroupName: groupName,
     })
   );
 }
 
-export async function handler(event: any) {
+export const handler = async (event: CreateUserEvent) => {
   try {
-    const input = event?.arguments?.input ?? event?.input ?? {};
-    const email = String(input.email ?? '').trim().toLowerCase();
-    const password = String(input.password ?? '');
-    const fullName = input.fullName ? String(input.fullName) : undefined;
-    const role = input.role === 'admin' ? 'admin' : 'user';
+    const email = String(event.arguments.email ?? '').trim().toLowerCase();
+    const password = String(event.arguments.password ?? '');
+    const fullName = event.arguments.fullName
+      ? String(event.arguments.fullName).trim()
+      : undefined;
+    const role = event.arguments.role === 'admin' ? 'admin' : 'user';
 
-    if (!email || !password || password.length < 8) {
-      return {
-        success: false,
-        message: 'Email and password are required. Password must be at least 8 characters.',
-      };
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return { success: false, message: 'Email không hợp lệ.' };
+    }
+
+    if (password.length < 8) {
+      return { success: false, message: 'Mật khẩu tối thiểu 8 ký tự.' };
     }
 
     await createCognitoUser({ email, password, fullName, role });
 
     return {
       success: true,
-      message: 'User created successfully.',
+      message: 'Tạo tài khoản Cognito thành công.',
     };
-  } catch (error: any) {
-    return {
-      success: false,
-      message: error?.message ?? 'Failed to create user.',
-    };
+  } catch (error) {
+    console.error('create-user handler error:', error);
+    const message =
+      error instanceof Error ? error.message : 'Không tạo được tài khoản.';
+    return { success: false, message };
   }
-}
+};

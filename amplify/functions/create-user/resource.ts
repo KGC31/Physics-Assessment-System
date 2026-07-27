@@ -1,13 +1,14 @@
-import { defineFunction } from '@aws-amplify/backend-function';
+import { defineFunction } from '@aws-amplify/backend';
 
+/**
+ * Admin-only: create Cognito email/password users (no self sign-up).
+ * COGNITO_USER_POOL_ID is set from amplify/backend.ts via addEnvironment().
+ */
 export const createUserFunction = defineFunction({
   name: 'create-user',
   entry: './handler.ts',
-  runtime: 20,
-  timeoutSeconds: 15,
-  memoryMB: 512,
+  timeoutSeconds: 30,
   environment: {
-    COGNITO_USER_POOL_ID: process.env.COGNITO_USER_POOL_ID ?? '',
-    APP_REGION: process.env.APP_REGION ?? process.env.AWS_REGION ?? 'ap-southeast-1',
+    COGNITO_USER_POOL_ID: '',
   },
 });

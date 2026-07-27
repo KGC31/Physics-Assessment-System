@@ -293,23 +293,27 @@ export function AuthProvider({
         password,
       });
 
-      if (!result.isSignedIn) {
+      if (result.isSignedIn) {
+        await loadSession();
+        return { error: null };
+      }
+
+      // AdminSetUserPassword(Permanent: true) should avoid this, but surface clearly if it appears.
+      if (result.nextStep?.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
         return {
-          error: "Đăng nhập thất bại.",
+          error: 'Tài khoản cần đổi mật khẩu tạm. Liên hệ admin để đặt lại mật khẩu cố định.',
         };
       }
 
-      await loadSession();
-
       return {
-        error: null,
+        error: `Đăng nhập chưa hoàn tất (${result.nextStep?.signInStep ?? 'unknown'}).`,
       };
     } catch (err) {
       return {
         error:
           err instanceof Error
             ? err.message
-            : "Đăng nhập thất bại.",
+            : 'Đăng nhập thất bại.',
       };
     }
   };

@@ -3,7 +3,7 @@ import { createUserFunction } from '../functions/create-user/resource';
 
 /**
  * Survey + profile storage: Amplify Data (AppSync + DynamoDB).
- * Better fit than S3 for structured records with Cognito owner/group auth.
+ * Users are created by admins (Cognito email/password) then mirrored in Profile.
  */
 const schema = a.schema({
   Profile: a
@@ -13,9 +13,7 @@ const schema = a.schema({
       role: a.enum(['user', 'admin']),
     })
     .authorization((allow) => [
-      // Admins invite users by email+role before Google SSO is allowed.
       allow.group('ADMIN').to(['create', 'read', 'update', 'delete']),
-      // Authenticated users may read so login can verify the email whitelist.
       allow.authenticated().to(['read']),
       allow.owner().to(['read', 'update']),
     ]),
@@ -36,19 +34,10 @@ const schema = a.schema({
       allow.group('ADMIN').to(['read', 'delete']),
     ]),
 
-  CreateUserInput: a
-    .customType({
-      email: a.email().required(),
-      password: a.string().required(),
-      fullName: a.string(),
-      role: a.enum(['user', 'admin']),
-    }),
-
-  CreateUserResult: a
-    .customType({
-      success: a.boolean().required(),
-      message: a.string(),
-    }),
+  CreateUserResult: a.customType({
+    success: a.boolean().required(),
+    message: a.string(),
+  }),
 
   createUser: a
     .mutation()
@@ -67,9 +56,6 @@ export type Schema = ClientSchema<typeof schema>;
 
 export const data = defineData({
   schema,
-  functions: {
-    createUser: createUserFunction,
-  },
   authorizationModes: {
     defaultAuthorizationMode: 'userPool',
   },

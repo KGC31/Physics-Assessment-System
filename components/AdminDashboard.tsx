@@ -126,62 +126,91 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
 
     try {
       const email = inviteEmail.trim().toLowerCase();
+      const fullName = inviteName.trim();
 
-      if (!email) {
-        throw new Error("Email không hợp lệ.");
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new Error('Email không hợp lệ.');
       }
 
       if (invitePassword.length < 8) {
-        throw new Error("Mật khẩu tối thiểu 8 ký tự.");
+        throw new Error('Mật khẩu tối thiểu 8 ký tự.');
       }
 
-      // 1. Tạo user trong Cognito thông qua AppSync mutation và Amplify Function
-      await dataClient.mutations.createUser({
-        email,
-        password: invitePassword,
-        fullName: inviteName,
-        role: inviteRole,
-      });
-
-      // 2. Tạo Profile
-      const { data, errors } =
-        await dataClient.models.Profile.create({
+      // 1. Create Cognito email/password user (admin API via Lambda).
+      const { data: createResult, errors: createErrors } =
+        await dataClient.mutations.createUser({
           email,
-          fullName: inviteName || undefined,
+          password: invitePassword,
+          fullName: fullName || undefined,
           role: inviteRole,
         });
 
-      if (errors?.length || !data) {
-        throw new Error(
-          errors?.map((e) => e.message).join(", ") ??
-          "Không tạo được Profile."
-        );
+      if (createErrors?.length) {
+        throw new Error(createErrors.map((err) => err.message).join(', '));
+      }
+      if (!createResult?.success) {
+        throw new Error(createResult?.message ?? 'Không tạo được tài khoản Cognito.');
       }
 
-      setUsers((prev) => [
-        {
-          id: data.id,
-          email: data.email,
-          role: (data.role as "admin" | "user") ?? inviteRole,
-          full_name: data.fullName ?? null,
-          created_at: data.createdAt ?? new Date().toISOString(),
-          updated_at: data.updatedAt ?? new Date().toISOString(),
-        },
-        ...prev,
-      ]);
+      // 2. Upsert Profile whitelist / role record.
+      const existing = await dataClient.models.Profile.list({
+        filter: { email: { eq: email } },
+        limit: 10,
+      });
+      const already =
+        existing.data?.find((p) => p.email.toLowerCase() === email) ??
+        existing.data?.[0];
 
-      setInviteSuccess("Tạo tài khoản thành công.");
+      let profileData;
+      if (already) {
+        const { data, errors } = await dataClient.models.Profile.update({
+          id: already.id,
+          role: inviteRole,
+          fullName: fullName || already.fullName || undefined,
+        });
+        if (errors?.length || !data) {
+          throw new Error(
+            errors?.map((err) => err.message).join(', ') ??
+              'Cognito đã tạo nhưng không cập nhật được Profile.'
+          );
+        }
+        profileData = data;
+      } else {
+        const { data, errors } = await dataClient.models.Profile.create({
+          email,
+          fullName: fullName || undefined,
+          role: inviteRole,
+        });
+        if (errors?.length || !data) {
+          throw new Error(
+            errors?.map((err) => err.message).join(', ') ??
+              'Cognito đã tạo nhưng không tạo được Profile.'
+          );
+        }
+        profileData = data;
+      }
 
-      setInviteEmail("");
-      setInvitePassword("");
-      setInviteName("");
-      setInviteRole("user");
+      const mapped = {
+        id: profileData.id,
+        email: profileData.email,
+        role: (profileData.role as 'admin' | 'user') ?? inviteRole,
+        full_name: profileData.fullName ?? null,
+        created_at: profileData.createdAt ?? new Date().toISOString(),
+        updated_at: profileData.updatedAt ?? new Date().toISOString(),
+      };
 
+      setUsers((prev) => [mapped, ...prev.filter((u) => u.id !== mapped.id)]);
+
+      setInviteSuccess(
+        `Đã tạo tài khoản ${email} (Cognito email/password · ${inviteRole}).`
+      );
+      setInviteEmail('');
+      setInvitePassword('');
+      setInviteName('');
+      setInviteRole('user');
       setShowAddForm(false);
     } catch (err) {
-      setInviteError(
-        err instanceof Error ? err.message : "Có lỗi xảy ra."
-      );
+      setInviteError(err instanceof Error ? err.message : 'Có lỗi xảy ra.');
     } finally {
       setInviteSaving(false);
     }
@@ -300,7 +329,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
         <div>
           <h2 className="text-2xl sm:text-3xl font-bold text-slate-800">Quản trị hệ thống</h2>
           <p className="text-slate-500 text-sm mt-1">
-            Quản lý người dùng và dữ liệu khảo sát (Cognito Google SSO · DynamoDB)
+            Quản lý người dùng và dữ liệu khảo sát (Cognito email/password · DynamoDB)
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 self-start">
@@ -313,7 +342,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
             }}
             className="px-5 py-2.5 rounded-xl bg-violet-600 text-white font-bold hover:bg-violet-700 transition-colors text-sm active:scale-95 shadow-sm"
           >
-            {showAddForm ? 'Đóng form' : '+ Thêm email / vai trò'}
+            {showAddForm ? 'Đóng form' : '+ Tạo tài khoản'}
           </button>
           <button
             onClick={onBack}
@@ -330,16 +359,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
           className="mb-6 p-5 rounded-2xl bg-white border-2 border-violet-200 shadow-sm space-y-4"
         >
           <div>
-            <h3 className="text-base font-bold text-slate-800">Thêm tài khoản được phép đăng nhập</h3>
+            <h3 className="text-base font-bold text-slate-800">Tạo tài khoản Cognito (email + mật khẩu)</h3>
             <p className="text-sm text-slate-600 mt-1 leading-relaxed">
-              Chỉ email đã được thêm mới đăng nhập Google thành công. Email chưa có trong danh sách
-              sẽ bị từ chối sau SSO.
+              Admin tạo user trong Cognito và Profile. Người dùng đăng nhập bằng email/mật khẩu —
+              không tự đăng ký.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            <div className="sm:col-span-1">
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Email Google *</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Email *</label>
               <input
                 type="email"
                 required
@@ -350,16 +379,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5">
-                Mật khẩu *
-              </label>
-
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Mật khẩu *</label>
               <input
                 type="password"
                 required
+                minLength={8}
                 value={invitePassword}
                 onChange={(e) => setInvitePassword(e.target.value)}
-                placeholder="********"
+                placeholder="Tối thiểu 8 ký tự"
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-violet-500"
               />
             </div>
@@ -388,8 +415,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
 
           {inviteRole === 'admin' && (
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
-              Vai trò Admin trong app. Để thao tác dữ liệu quản trị qua API, hãy thêm user vào nhóm
-              Cognito <strong>ADMIN</strong> sau khi họ đăng nhập lần đầu.
+              User sẽ được thêm vào nhóm Cognito <strong>ADMIN</strong> và Profile role = admin.
             </p>
           )}
 
@@ -415,9 +441,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
       )}
 
       <div className="mb-6 p-4 rounded-xl bg-violet-50 border border-violet-100 text-sm text-violet-800">
-        Đăng nhập là <strong>invite-only</strong>: thêm email tại đây trước. Google SSO với email
-        chưa có trong danh sách sẽ không được cấp quyền. Nhóm Cognito <strong>ADMIN</strong> vẫn
-        cần cho thao tác quản trị dữ liệu.
+        Tài khoản chỉ do admin tạo (Cognito email/mật khẩu). Self sign-up bị tắt. Chỉ email có trong
+        Profile mới được phép đăng nhập app.
       </div>
 
       <div className="flex gap-1 mb-8 bg-slate-100 p-1 rounded-xl w-fit">
