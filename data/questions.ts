@@ -55,7 +55,7 @@ export const questions: Question[] = [
   // Nhóm E
   { id: 'E1', group: 'E', text: 'Ông bà có cảm giác khó chịu trong lồng ngực hoặc vùng bụng trướng đầy hay không?' },
   { id: 'E2', group: 'E', text: 'Ông bà có cảm giác mình mẩy nặng nề không thoải mái không?' },
-  { id: 'E3', group: 'E', text: 'Ông bà có thấy bụng béo mềm nhẽo không?' },
+  { id: 'E3', group: 'E', text: 'Ông bà có thấy bụng béo mềm nhão không?' },
   { id: 'E4', group: 'E', text: 'Ông bà có thấy hiện tượng vùng trán tiết nhờn không?' },
   { id: 'E5', group: 'E', text: 'Ông bà có thấy mi mắt trên nề hơn so với người bình thường không? (Mi mắt trên có hiện tượng phù nhẹ vào lúc ngủ dậy?)' },
   { id: 'E6', group: 'E', text: 'Ông bà có cảm giác dính nhớt trong miệng không?' },
