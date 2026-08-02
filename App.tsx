@@ -17,11 +17,32 @@ import { PatientInfoForm } from './components/PatientInfoForm';
 import { LoginPage } from './components/LoginPage';
 import { UserRecords } from './components/UserRecords';
 import { AdminDashboard } from './components/AdminDashboard';
+import { ManagementHome } from './components/pages/ManagementHome';
+import { PatientRecordsList } from './components/pages/PatientRecordsList';
+import { ResultsDetail } from './components/pages/ResultsDetail';
 import { useAuth } from './contexts/AuthContext';
+import { dataClient } from './lib/amplifyClient';
+import { parseJsonField } from './utils';
 
 const logo = '/logo.jpg';
 
-type AppStep = 'landing' | 'login' | 'records' | 'admin' | 'gender' | 'quiz' | 'result';
+type AppStep = 'landing' | 'login' | 'records' | 'admin' | 'gender' | 'quiz' | 'result' | 'management' | 'management-records' | 'management-results';
+
+interface RecordForDetail {
+  id: string;
+  patient_name: string;
+  birth_year: number;
+  address: string;
+  gender: string;
+  created_at: string;
+  results: Array<{
+    group: string;
+    name: string;
+    rawScore: number;
+    convertedScore: number;
+    diagnosis: string;
+  }>;
+}
 
 export default function App() {
   const { user, profile, isAdmin, signOut, loading: authLoading, authError } = useAuth();
@@ -36,6 +57,17 @@ export default function App() {
   const [birthYear, setBirthYear] = useState('');
   const [address, setAddress] = useState('');
   const [selectedGenderTemp, setSelectedGenderTemp] = useState<Gender | null>(null);
+
+  // Management pages
+  const [recordCount, setRecordCount] = useState(0);
+  const [selectedRecord, setSelectedRecord] = useState<RecordForDetail | null>(null);
+
+  const loadRecordCount = async () => {
+    const { data, errors } = await dataClient.models.SurveyRecord.list({ limit: 500 });
+    if (!errors && data) {
+      setRecordCount(data.length);
+    }
+  };
 
   // Lọc ra các câu hỏi hợp lệ dựa trên giới tính
   const activeQuestions = useMemo(() => {
@@ -53,6 +85,10 @@ export default function App() {
       setStep('landing');
     }
   }, [authLoading, authError, user, step]);
+
+  useEffect(() => {
+    if (user) loadRecordCount();
+  }, [user]);
 
   const handleStart = () => {
     if (!user) {
@@ -219,10 +255,10 @@ export default function App() {
                 ) : (
                   <>
                     <button
-                      onClick={() => setStep('records')}
+                      onClick={() => setStep('management')}
                       className="px-6 py-3 rounded-xl border-2 border-emerald-200 text-emerald-700 font-bold hover:bg-emerald-50 transition-colors text-sm active:scale-95"
                     >
-                      📋 Lịch sử khảo sát
+                      📋 Quản lý hồ sơ
                     </button>
                     {isAdmin && (
                       <button
@@ -352,6 +388,67 @@ export default function App() {
                 birthYear={birthYear}
                 address={address}
                 gender={gender || undefined}
+              />
+            </motion.div>
+          )}
+
+          {!authLoading && step === 'management' && user && (
+            <motion.div
+              key="management"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="w-full"
+            >
+              <ManagementHome
+                recordCount={recordCount}
+                onNavigate={(page) => {
+                  if (page === 'records') {
+                    setStep('management-records');
+                  } else if (page === 'reports') {
+                    setStep('management-records');
+                  } else if (page === 'settings') {
+                    setStep('management-records');
+                  }
+                }}
+                onBack={handleReset}
+              />
+            </motion.div>
+          )}
+
+          {!authLoading && step === 'management-records' && user && (
+            <motion.div
+              key="management-records"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="w-full"
+            >
+              <PatientRecordsList
+                onBack={() => setStep('management')}
+                onSelectRecord={(record) => {
+                  setSelectedRecord(record);
+                  setStep('management-results');
+                }}
+              />
+            </motion.div>
+          )}
+
+          {!authLoading && step === 'management-results' && user && selectedRecord && (
+            <motion.div
+              key="management-results"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="w-full"
+            >
+              <ResultsDetail
+                results={selectedRecord.results}
+                patientName={selectedRecord.patient_name}
+                gender={selectedRecord.gender}
+                birthYear={selectedRecord.birth_year}
+                createdAt={selectedRecord.created_at}
+                onBack={() => setStep('management-records')}
               />
             </motion.div>
           )}
