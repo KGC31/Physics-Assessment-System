@@ -166,11 +166,11 @@ export const ResultDashboard: React.FC<ResultDashboardProps> = ({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto py-8">
+    <div className="w-full max-w-4xl mx-auto py-6">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="space-y-12"
+        className="flex flex-col gap-8"
       >
         <div className="text-center space-y-4">
           <h1 className="text-3xl sm:text-4xl font-semibold text-slate-800">Kết quả đánh giá thể chất</h1>

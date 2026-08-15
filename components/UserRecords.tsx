@@ -104,7 +104,7 @@ export const UserRecords: React.FC<UserRecordsProps> = ({ onBack }) => {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="w-full max-w-4xl mx-auto py-4"
+      className="w-full max-w-4xl mx-auto py-6"
     >
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -124,7 +124,7 @@ export const UserRecords: React.FC<UserRecordsProps> = ({ onBack }) => {
           <div className="w-8 h-8 border-3 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
         </div>
       ) : records.length === 0 ? (
-        <div className="text-center py-20 bg-slate-50 rounded-2xl border border-slate-100">
+        <div className="text-center py-20 bg-card rounded-2xl border border-border">
           <div className="text-5xl mb-4">📋</div>
           <h3 className="text-lg font-semibold text-slate-700 mb-2">Chưa có bản ghi nào</h3>
           <p className="text-slate-500 text-sm">Hoàn thành một bài khảo sát và lưu kết quả để xem ở đây.</p>

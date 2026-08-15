@@ -18,6 +18,7 @@ import { LoginPage } from './components/LoginPage';
 import { UserRecords } from './components/UserRecords';
 import { AdminDashboard } from './components/AdminDashboard';
 import { useAuth } from './contexts/AuthContext';
+import { ArrowRight, ClipboardList, LogOut, Settings2, ShieldCheck, Sparkles } from 'lucide-react';
 
 const logo = '/logo.jpg';
 
@@ -120,17 +121,17 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FDFDFD] font-sans text-slate-800 selection:bg-emerald-100 flex flex-col items-center">
-      <header className="flex w-full items-center justify-between px-4 sm:px-8 py-5 border-b border-slate-100 bg-white shadow-sm sticky top-0 z-10">
+    <div className="min-h-screen bg-background font-sans text-foreground flex flex-col items-center">
+      <header className="flex w-full items-center justify-between px-4 sm:px-8 py-4 border-b border-border/80 bg-card/95 backdrop-blur sticky top-0 z-10">
         <div 
           onClick={handleReset}
           className="flex items-center gap-3 cursor-pointer group select-none"
           title="Quay lại giao diện đầu"
         >
-          <div className="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center text-white font-bold group-hover:bg-emerald-700 transition-colors">Y</div>
+          <div className="size-10 bg-primary rounded-2xl flex items-center justify-center text-primary-foreground font-bold group-hover:scale-105 transition-transform">Y</div>
           <div>
-            <h1 className="text-lg font-semibold tracking-tight text-slate-900 leading-tight group-hover:text-emerald-700 transition-colors">HỆ THỐNG ĐÁNH GIÁ THỂ CHẤT</h1>
-            <p className="text-[10px] sm:text-xs text-slate-400 font-medium uppercase tracking-widest leading-none mt-1">Dành cho Nghiên cứu Y khoa</p>
+            <h1 className="text-sm sm:text-base font-semibold tracking-tight text-foreground leading-tight group-hover:text-primary transition-colors">HỆ THỐNG ĐÁNH GIÁ THỂ CHẤT</h1>
+            <p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-widest leading-none mt-1">Nghiên cứu và thực hành y khoa</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -149,14 +150,14 @@ export default function App() {
           {/* Auth controls in header */}
           {user && step === 'landing' && (
             <div className="hidden sm:flex items-center gap-2">
-              <span className="text-xs text-slate-500 max-w-[120px] truncate" title={profile?.full_name || profile?.email || ''}>
+              <span className="text-xs text-muted-foreground max-w-[140px] truncate" title={profile?.full_name || profile?.email || ''}>
                 {profile?.full_name || profile?.email}
               </span>
               <button
                 onClick={signOut}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-muted-foreground hover:text-destructive hover:bg-red-50 transition-colors"
               >
-                Đăng xuất
+                <LogOut className="size-3.5" aria-hidden="true" /> Đăng xuất
               </button>
             </div>
           )}
@@ -189,27 +190,30 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 1.05 }}
-              className="flex flex-col items-center justify-center flex-1 space-y-8 text-center min-h-[60vh]"
+              className="flex flex-col items-center justify-center flex-1 gap-8 text-center min-h-[60vh] py-8"
             >
-              <div className="flex flex-col items-center space-y-6 max-w-2xl">
+              <div className="flex flex-col items-center gap-6 max-w-2xl">
                 <img 
                   src={logo} 
                   alt="Logo" 
-                  className="w-32 h-32 sm:w-40 sm:h-40 object-contain rounded-3xl shadow-xl border border-slate-100 bg-white p-3 transition-transform duration-300 hover:scale-105 mb-4" 
+                  className="size-28 sm:size-36 object-contain rounded-[2rem] shadow-lg border border-border bg-card p-3 transition-transform duration-300 hover:scale-105 mb-2" 
                 />
-                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-tight">
-                  <span className="text-emerald-600">Khảo sát Thể chất</span> <br />
-                  <span className="text-emerald-600">Y học cổ truyền</span>
+                <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
+                  <Sparkles className="size-3.5" aria-hidden="true" /> Khảo sát có hướng dẫn
+                </div>
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.08] text-balance">
+                  Hiểu cơ thể, <span className="text-primary">chăm sóc đúng cách</span>
                 </h1>
-                <p className="text-lg text-slate-500 max-w-lg mx-auto leading-relaxed">
-                  Công cụ hỗ trợ học tập và đánh giá 9 loại thể chất phổ biến dựa trên các biểu hiện lâm sàng. Dành riêng cho nghiên cứu và thực hành y khoa.
+                <p className="text-base sm:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
+                  Công cụ hỗ trợ học tập và đánh giá 9 loại thể chất phổ biến dựa trên các biểu hiện lâm sàng. Trả lời từng câu hỏi theo cảm nhận của bạn trong 1 năm gần đây.
                 </p>
               </div>
               <button
                 onClick={handleStart}
-                className="px-10 py-4 mt-6 rounded-xl bg-gradient-to-r from-rose-500 to-rose-600 text-white font-bold hover:from-rose-600 hover:to-rose-700 transition-all uppercase tracking-widest text-sm shadow-lg shadow-rose-200 active:scale-95"
+                className="inline-flex items-center gap-3 px-7 py-4 mt-2 rounded-2xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition-all text-sm shadow-lg shadow-primary/20 active:scale-[0.98]"
               >
-                {user ? 'Bắt đầu bài kiểm tra' : 'Đăng nhập để làm bài kiểm tra'}
+                {user ? 'Bắt đầu bài kiểm tra' : 'Đăng nhập để bắt đầu'}
+                <ArrowRight className="size-4" aria-hidden="true" />
               </button>
 
               {/* Auth-related buttons */}
@@ -220,16 +224,16 @@ export default function App() {
                   <>
                     <button
                       onClick={() => setStep('records')}
-                      className="px-6 py-3 rounded-xl border-2 border-emerald-200 text-emerald-700 font-bold hover:bg-emerald-50 transition-colors text-sm active:scale-95"
+                      className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-primary/25 text-primary font-bold hover:bg-primary/10 transition-colors text-sm active:scale-95"
                     >
-                      📋 Lịch sử khảo sát
+                      <ClipboardList className="size-4" aria-hidden="true" /> Lịch sử khảo sát
                     </button>
                     {isAdmin && (
                       <button
                         onClick={() => setStep('admin')}
-                        className="px-6 py-3 rounded-xl border-2 border-violet-200 text-violet-700 font-bold hover:bg-violet-50 transition-colors text-sm active:scale-95"
+                        className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-violet-200 text-violet-700 font-bold hover:bg-violet-50 transition-colors text-sm active:scale-95"
                       >
-                        ⚙️ Quản trị
+                        <Settings2 className="size-4" aria-hidden="true" /> Quản trị
                       </button>
                     )}
                     {/* Mobile sign-out */}

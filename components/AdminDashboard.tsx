@@ -364,7 +364,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="w-full max-w-5xl mx-auto py-4"
+      className="w-full max-w-5xl mx-auto py-6"
     >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
@@ -481,7 +481,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
         </form>
       )}
 
-      <div className="mb-6 p-4 rounded-xl bg-violet-50 border border-violet-100 text-sm text-violet-800">
+      <div className="mb-6 p-4 rounded-xl bg-violet-50/70 border border-violet-100 text-sm text-violet-800">
         Tài khoản chỉ do admin tạo (Cognito email/mật khẩu). Self sign-up bị tắt. Chỉ email có trong
         Profile mới được phép đăng nhập app.
       </div>
