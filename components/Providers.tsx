@@ -5,7 +5,11 @@ import outputs from '@/amplify_outputs.json';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
 
-Amplify.configure(outputs, { ssr: true });
+// Configure Amplify only when deployment outputs are available. This prevents
+// a clean preview checkout from crashing before the generated backend exists.
+if (Object.keys(outputs).length > 0) {
+  Amplify.configure(outputs, { ssr: true });
+}
 
 function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
   const message = error instanceof Error ? error.message : String(error);
