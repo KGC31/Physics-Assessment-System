@@ -120,8 +120,8 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FDFDFD] font-sans text-slate-800 selection:bg-emerald-100 flex flex-col items-center">
-      <header className="flex w-full items-center justify-between px-4 sm:px-8 py-5 border-b border-slate-100 bg-white shadow-sm sticky top-0 z-10">
+    <div className="min-h-screen bg-[#f6f8f5] font-sans text-slate-800 selection:bg-emerald-100 flex flex-col items-center">
+      <header className="flex w-full items-center justify-between px-4 sm:px-8 py-3 border-b border-slate-200 bg-white sticky top-0 z-10">
         <div 
           onClick={handleReset}
           className="flex items-center gap-3 cursor-pointer group select-none"
@@ -163,7 +163,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col overflow-hidden w-full max-w-5xl px-4 sm:px-8 py-12 relative">
+      <main className="flex-1 flex flex-col overflow-hidden w-full max-w-6xl px-4 sm:px-8 py-6 sm:py-8 relative">
         {step === 'quiz' && (
           <div className="mb-8 w-full sm:hidden">
             <ProgressBar current={currentQuestionIndex + 1} total={activeQuestions.length} />
@@ -207,7 +207,7 @@ export default function App() {
               </div>
               <button
                 onClick={handleStart}
-                className="px-10 py-4 mt-6 rounded-xl bg-gradient-to-r from-rose-500 to-rose-600 text-white font-bold hover:from-rose-600 hover:to-rose-700 transition-all uppercase tracking-widest text-sm shadow-lg shadow-rose-200 active:scale-95"
+                className="px-8 py-3 rounded-lg bg-emerald-700 text-white font-semibold hover:bg-emerald-800 transition-colors text-sm shadow-sm active:scale-95"
               >
                 {user ? 'Bắt đầu bài kiểm tra' : 'Đăng nhập để làm bài kiểm tra'}
               </button>

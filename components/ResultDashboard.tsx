@@ -166,17 +166,15 @@ export const ResultDashboard: React.FC<ResultDashboardProps> = ({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto py-8">
+    <div className="w-full max-w-5xl mx-auto py-2">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="space-y-12"
+        className="space-y-6"
       >
-        <div className="text-center space-y-4">
-          <h1 className="text-3xl sm:text-4xl font-semibold text-slate-800">Kết quả đánh giá thể chất</h1>
-          <p className="text-slate-500 max-w-lg mx-auto">
-            Dựa trên hệ thống phân loại Y học cổ truyền. Thông tin này nhằm mục đích tham khảo và giáo dục sức khỏe.
-          </p>
+        <div className="text-left space-y-2 border-b border-slate-200 pb-5">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2"><div><p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Kết quả khảo sát</p><h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Kết quả đánh giá thể chất</h1></div><span className="text-xs text-slate-500">Thông tin tham khảo và giáo dục sức khỏe</span></div>
+
           {patientName && (
             <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-emerald-50 border border-emerald-100">
               <span className="text-sm text-emerald-800 font-medium">
@@ -218,7 +216,7 @@ export const ResultDashboard: React.FC<ResultDashboardProps> = ({
 
         {/* Thể chất bệnh lý nổi bật */}
         <div className="space-y-6">
-          <h3 className="text-xl font-semibold text-slate-800">Các Thể Chất Cần Lưu Ý</h3>
+          <div><h3 className="text-lg font-bold text-slate-900">Các thể chất cần lưu ý</h3><p className="text-sm text-slate-500 mt-1">Ưu tiên xem các nhóm có trạng thái xác định hoặc có xu hướng.</p></div>
           {positivePathology.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {positivePathology.map((result, idx) => (
@@ -229,7 +227,7 @@ export const ResultDashboard: React.FC<ResultDashboardProps> = ({
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: idx * 0.1 }}
                   className={cn(
-                    "p-6 rounded-2xl border cursor-pointer hover:shadow-md transition-all",
+                    "p-4 rounded-xl border cursor-pointer hover:shadow-md transition-all",
                     result.diagnosis === 'Xác định' 
                       ? "bg-rose-50 border-rose-100 hover:border-rose-300" 
                       : "bg-amber-50 border-amber-100 hover:border-amber-300"
@@ -275,12 +273,12 @@ export const ResultDashboard: React.FC<ResultDashboardProps> = ({
 
         {/* Chế độ dinh dưỡng đề xuất tổng quan */}
         {activeConstitutionKeys.length > 0 && (
-          <div className="space-y-6 pt-8 border-t border-slate-200">
+          <div className="space-y-4 pt-5 border-t border-slate-200">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700">
                 <Apple className="w-5 h-5" />
               </div>
-              <h3 className="text-xl font-bold text-slate-800">Chế độ dinh dưỡng đề xuất theo thể chất</h3>
+              <div><h3 className="text-lg font-bold text-slate-900">Gợi ý dinh dưỡng</h3><p className="text-sm text-slate-500 mt-1">Các lựa chọn dưới đây giúp bạn tham khảo cách chăm sóc phù hợp hơn.</p></div>
             </div>
             
             <div className="grid grid-cols-1 gap-5">
@@ -288,7 +286,7 @@ export const ResultDashboard: React.FC<ResultDashboardProps> = ({
                 const rec = recommendations.find(r => r.section_key === key);
                 if (!rec) return null;
                 return (
-                  <div key={key} className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300 space-y-4">
+                  <div key={key} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow duration-200 space-y-3">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                       <h4 className="font-bold text-slate-800 text-lg flex items-center gap-2">
                         <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" />
@@ -375,7 +373,7 @@ export const ResultDashboard: React.FC<ResultDashboardProps> = ({
           )}
         </div>
 
-        <div className="flex justify-center flex-wrap gap-4 pt-8">
+        <div className="flex justify-center flex-wrap gap-3 pt-3">
           <button
             onClick={onEditAnswers}
             className="px-8 py-4 mt-6 rounded-xl font-bold uppercase tracking-widest text-xs transition-colors text-slate-500 bg-slate-100 hover:bg-slate-200 active:scale-95"

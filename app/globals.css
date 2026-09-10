@@ -8,6 +8,7 @@
 /* Smooth scrolling */
 html {
   scroll-behavior: smooth;
+  background: #f6f8f5;
 }
 
 /* Custom scrollbar */

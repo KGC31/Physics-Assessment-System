@@ -28,9 +28,9 @@ export const QuizCard: React.FC<QuizCardProps> = ({ question, selectedAnswer, on
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       transition={{ duration: 0.3 }}
-      className="w-full max-w-2xl mx-auto flex flex-col justify-center items-center"
+      className="w-full max-w-3xl mx-auto flex flex-col items-center"
     >
-      <div className="w-full mb-8 flex justify-between items-end">
+      <div className="w-full mb-5 flex justify-between items-end">
         <div className="flex flex-col gap-1 w-full">
           <span className="text-emerald-600 text-sm font-bold tracking-wide uppercase">
             Câu hỏi {question.id} / Nhóm {question.group}
@@ -38,7 +38,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ question, selectedAnswer, on
           <p className="text-slate-500 text-sm italic mb-2 tracking-tight">
             Căn cứ vào cảm nhận của cơ thể trong 1 năm gần đây, ông bà hãy trả lời câu hỏi dưới đây:
           </p>
-          <h3 className="text-2xl font-semibold text-slate-900 leading-tight">
+          <h3 className="text-xl sm:text-2xl font-semibold text-slate-900 leading-snug">
             {question.text}
           </h3>
         </div>
@@ -53,7 +53,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ question, selectedAnswer, on
               disabled={disabled}
               onClick={() => !disabled && onAnswer(score)}
               className={cn(
-                "group flex items-center justify-between p-5 rounded-2xl border-2 transition-all duration-300 text-left",
+                "group flex items-center justify-between p-3.5 sm:p-4 rounded-xl border transition-all duration-200 text-left",
                 isSelected
                   ? "border-emerald-600 bg-emerald-100 shadow-md shadow-emerald-100"
                   : "border-emerald-200 bg-emerald-50/70 hover:border-emerald-500 hover:bg-emerald-100 hover:shadow-sm",
@@ -62,7 +62,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ question, selectedAnswer, on
             >
               <div className="flex items-center gap-4">
                 <span className={cn(
-                  "w-10 h-10 shrink-0 flex items-center justify-center rounded-xl font-bold transition-colors",
+                  "w-9 h-9 shrink-0 flex items-center justify-center rounded-lg font-bold transition-colors",
                   isSelected
                     ? "bg-emerald-600 text-white"
                     : "bg-white text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"
@@ -71,7 +71,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ question, selectedAnswer, on
                 </span>
                 <div className="flex flex-col">
                   <span className={cn(
-                    "text-lg font-medium",
+                    "text-base font-semibold",
                     isSelected ? "text-slate-900" : "text-slate-700"
                   )}>
                     {SCORE_LABELS[score].title}
@@ -96,7 +96,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ question, selectedAnswer, on
         })}
       </div>
       
-      <div className="flex justify-between w-full mt-10">
+      <div className="flex justify-between w-full mt-5">
         <button
           onClick={onPrevious}
           disabled={!canGoBack || disabled}
