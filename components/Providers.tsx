@@ -1,11 +1,11 @@
 'use client';
 
 import { Amplify } from 'aws-amplify';
-import outputs from '@/amplify_outputs.json';
+import { amplifyOutputs } from '@/lib/amplifyConfig';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
 
-Amplify.configure(outputs, { ssr: true });
+Amplify.configure(amplifyOutputs, { ssr: true });
 
 function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
   const message = error instanceof Error ? error.message : String(error);
