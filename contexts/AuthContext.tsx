@@ -55,6 +55,8 @@ interface AuthContextType {
     newPassword: string
   ) => Promise<{ error: string | null }>;
   refreshProfile: () => Promise<void>;
+  isPreviewAdmin: boolean;
+  exitPreviewAdmin: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -152,11 +154,29 @@ async function touchProfileName(
   }
 }
 
+const PREVIEW_ADMIN_ENABLED = process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_PREVIEW_ADMIN === 'true';
+
+const PREVIEW_ADMIN_USER: AuthUser = {
+  userId: 'preview-admin',
+  username: 'preview-admin',
+  email: 'admin@preview.local',
+  fullName: 'Preview Admin',
+};
+
+const PREVIEW_ADMIN_PROFILE: Profile = {
+  id: 'admin@preview.local',
+  email: 'admin@preview.local',
+  role: 'admin',
+  full_name: 'Preview Admin',
+  created_at: new Date(0).toISOString(),
+  updated_at: new Date(0).toISOString(),
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(PREVIEW_ADMIN_ENABLED ? PREVIEW_ADMIN_USER : null);
+  const [profile, setProfile] = useState<Profile | null>(PREVIEW_ADMIN_ENABLED ? PREVIEW_ADMIN_PROFILE : null);
+  const [loading, setLoading] = useState(!PREVIEW_ADMIN_ENABLED);
+  const [isAdmin, setIsAdmin] = useState(PREVIEW_ADMIN_ENABLED);
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Serialize loadSession so Hub "signedIn" + signIn() don't race-create Profiles.
@@ -242,6 +262,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadSession]);
 
   useEffect(() => {
+    if (PREVIEW_ADMIN_ENABLED) return;
     loadSession();
 
     const unsubscribe = Hub.listen('auth', ({ payload }) => {
@@ -328,7 +349,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const exitPreviewAdmin = () => {
+    if (!PREVIEW_ADMIN_ENABLED) return;
+    setUser(null);
+    setProfile(null);
+    setIsAdmin(false);
+  };
+
   const signOut = async () => {
+    if (PREVIEW_ADMIN_ENABLED) {
+      exitPreviewAdmin();
+      return;
+    }
     await amplifySignOut({ global: true });
     setUser(null);
     setProfile(null);
@@ -349,6 +381,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         forgotPassword,
         confirmForgotPassword,
         refreshProfile,
+        isPreviewAdmin: PREVIEW_ADMIN_ENABLED && Boolean(user),
+        exitPreviewAdmin,
       }}
     >
       {children}

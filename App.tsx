@@ -24,7 +24,7 @@ const logo = '/logo.jpg';
 type AppStep = 'landing' | 'login' | 'records' | 'admin' | 'gender' | 'quiz' | 'result';
 
 export default function App() {
-  const { user, profile, isAdmin, signOut, loading: authLoading, authError } = useAuth();
+  const { user, profile, isAdmin, isPreviewAdmin, signOut, exitPreviewAdmin, loading: authLoading, authError } = useAuth();
   const [step, setStep] = useState<AppStep>('landing');
   const [gender, setGender] = useState<Gender | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -120,48 +120,19 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f6f8f5] font-sans text-slate-800 selection:bg-emerald-100 flex flex-col items-center">
-      <header className="flex w-full items-center justify-between px-4 sm:px-8 py-3 border-b border-slate-200 bg-white sticky top-0 z-10">
-        <div 
-          onClick={handleReset}
-          className="flex items-center gap-3 cursor-pointer group select-none"
-          title="Quay lại giao diện đầu"
-        >
-          <div className="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center text-white font-bold group-hover:bg-emerald-700 transition-colors">Y</div>
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight text-slate-900 leading-tight group-hover:text-emerald-700 transition-colors">Study Constitution</h1>
-            <p className="text-[10px] sm:text-xs text-slate-400 font-medium uppercase tracking-widest leading-none mt-1">Học tập & khảo sát y khoa</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          {step === 'quiz' && (
-            <div className="w-[150px] sm:w-[200px] hidden sm:block">
-              <ProgressBar current={currentQuestionIndex + 1} total={activeQuestions.length} />
-            </div>
-          )}
-          {step !== 'landing' && (
-            <img 
-              src={logo} 
-              alt="Logo" 
-              className="h-10 w-auto object-contain rounded-md shadow-sm border border-slate-100" 
-            />
-          )}
-          {/* Auth controls in header */}
-          {user && step === 'landing' && (
-            <div className="hidden sm:flex items-center gap-2">
-              <span className="text-xs text-slate-500 max-w-[120px] truncate" title={profile?.full_name || profile?.email || ''}>
-                {profile?.full_name || profile?.email}
-              </span>
-              <button
-                onClick={signOut}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-              >
-                Đăng xuất
-              </button>
-            </div>
-          )}
+    <div className="min-h-screen bg-[#f8f7f4] font-sans text-slate-950 selection:bg-orange-100 flex flex-col overflow-hidden">
+      <header className="relative z-10 flex w-full items-center justify-between px-6 py-6 sm:px-10 lg:px-16">
+        <button onClick={handleReset} className="flex items-center gap-3" title="Về trang đầu">
+          <span className="flex items-center gap-1" aria-hidden="true"><span className="h-2 w-2 rounded-full bg-slate-950" /><span className="h-2 w-2 rounded-full bg-slate-950" /></span>
+          <span className="sr-only">Study Constitution</span>
+        </button>
+        <div className="flex items-center gap-5 text-[11px] font-medium uppercase tracking-wide text-slate-700 sm:gap-8">
+          <span className="hidden sm:inline">VN / EN</span>
+          <span className="hidden sm:inline">Study lab</span>
+          <button onClick={handleReset} className="flex items-center gap-3" aria-label="Mở menu"><span>Menu</span><span className="flex w-6 flex-col gap-1.5"><span className="h-px w-full bg-slate-950" /><span className="h-px w-full bg-slate-950" /></span></button>
         </div>
       </header>
+      {isPreviewAdmin && <div className="relative z-10 mx-6 flex items-center justify-between rounded-full border border-orange-200 bg-orange-50 px-4 py-2 text-xs text-orange-900 sm:mx-10 lg:mx-16"><span><strong>Preview admin mode</strong> · Chỉ dùng trong môi trường phát triển.</span><button onClick={exitPreviewAdmin} className="font-semibold underline underline-offset-2">Thoát</button></div>}
 
       <main className="flex-1 flex flex-col overflow-hidden w-full max-w-6xl px-4 sm:px-8 py-6 sm:py-8 relative">
         {step === 'quiz' && (
@@ -189,60 +160,22 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 1.05 }}
-              className="flex flex-col justify-center flex-1 py-4 sm:py-8 min-h-[60vh]"
+              className="relative flex flex-1 flex-col justify-between py-12 sm:py-16 lg:py-20"
             >
-              <div className="grid items-center gap-8 lg:grid-cols-[1.1fr_0.9fr] max-w-5xl w-full mx-auto">
-                <img 
-                  src={logo} 
-                  alt="Logo" 
-                  className="w-16 h-16 object-contain rounded-xl border border-slate-200 bg-white p-2 shadow-sm" 
-                />
-                <div className="max-w-2xl"><p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Nền tảng học tập và khảo sát</p><h1 className="text-4xl font-bold leading-[1.05] tracking-tight text-slate-950 sm:text-6xl">Luyện tập có hệ thống.<br /><span className="text-emerald-700">Đọc kết quả dễ hiểu.</span></h1><p className="mt-5 max-w-xl text-base leading-7 text-slate-600">Khám phá 9 nhóm thể chất qua một bài khảo sát ngắn, trực quan và phù hợp cho học tập, nghiên cứu y khoa cổ truyền.</p></div>
-              </div>
-              <div className="grid max-w-2xl grid-cols-3 gap-3 text-left"><div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"><p className="text-lg font-bold text-slate-950">09</p><p className="mt-1 text-xs leading-4 text-slate-500">nhóm thể chất</p></div><div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"><p className="text-lg font-bold text-slate-950">01</p><p className="mt-1 text-xs leading-4 text-slate-500">bài khảo sát</p></div><div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"><p className="text-lg font-bold text-slate-950">10′</p><p className="mt-1 text-xs leading-4 text-slate-500">thời gian dự kiến</p></div></div>
-              <button
-                onClick={handleStart}
-                className="self-start rounded-lg bg-emerald-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 active:scale-95"
-              >
-                {user ? 'Bắt đầu bài kiểm tra' : 'Đăng nhập để làm bài kiểm tra'}
-              </button>
-
-              {/* Auth-related buttons */}
-              <div className="flex flex-wrap items-center gap-3 pt-1">
-                {!user ? (
-                  <></>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => setStep('records')}
-                      className="px-6 py-3 rounded-xl border-2 border-emerald-200 text-emerald-700 font-bold hover:bg-emerald-50 transition-colors text-sm active:scale-95"
-                    >
-                      📋 Lịch sử khảo sát
-                    </button>
-                    {isAdmin && (
-                      <button
-                        onClick={() => setStep('admin')}
-                        className="px-6 py-3 rounded-xl border-2 border-violet-200 text-violet-700 font-bold hover:bg-violet-50 transition-colors text-sm active:scale-95"
-                      >
-                        ⚙️ Quản trị
-                      </button>
-                    )}
-                    {/* Mobile sign-out */}
-                    <button
-                      onClick={signOut}
-                      className="sm:hidden px-6 py-3 rounded-xl border border-slate-200 text-slate-500 font-bold hover:bg-slate-50 transition-colors text-sm active:scale-95"
-                    >
-                      Đăng xuất
-                    </button>
-                  </>
-                )}
-              </div>
-
-              {!user && authError && (
-                <div className="max-w-lg mx-auto p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm font-medium">
-                  {authError}
+              <div className="pointer-events-none absolute -right-32 top-0 h-[32rem] w-[32rem] rounded-full bg-[radial-gradient(circle,_rgba(249,170,103,0.48)_0%,_rgba(249,211,155,0.24)_35%,_rgba(248,247,244,0)_70%)] blur-2xl" />
+              <div className="relative z-[1] flex max-w-3xl flex-col gap-8 px-6 sm:px-10 lg:px-16">
+                <p className="text-xs font-medium uppercase tracking-[0.22em] text-slate-500">Study Constitution / 01</p>
+                <h1 className="max-w-4xl text-[3.5rem] font-light uppercase leading-[0.94] tracking-[-0.07em] text-slate-950 sm:text-7xl lg:text-[7.4rem]">We make<br />study results<br /><span className="text-slate-500">easy to read.</span></h1>
+                <p className="max-w-md text-sm leading-6 text-slate-600 sm:text-base">Một bài khảo sát rõ ràng để bạn luyện tập, quan sát và hiểu các nhóm thể chất trong Y học cổ truyền.</p>
+                <div className="flex flex-wrap items-center gap-4">
+                  <button onClick={handleStart} className="rounded-full border border-slate-950 bg-transparent px-6 py-3 text-xs font-medium uppercase tracking-wide text-slate-950 transition hover:bg-slate-950 hover:text-white">{user ? 'Start assessment' : 'Enter study space'}</button>
+                  <span className="text-xs text-slate-500">01 / 10 min / guided</span>
                 </div>
-              )}
+                <div className="flex flex-wrap gap-6 pt-5 text-[11px] uppercase tracking-wide text-slate-500"><span>09 constitution groups</span><span>Student-friendly</span><span>Reference-based</span></div>
+                {user && <div className="flex flex-wrap gap-3 pt-2"><button onClick={() => setStep('records')} className="text-xs font-semibold uppercase tracking-wide text-slate-700 underline underline-offset-4">View history</button>{isAdmin && <button onClick={() => setStep('admin')} className="text-xs font-semibold uppercase tracking-wide text-slate-700 underline underline-offset-4">Open admin</button>}<button onClick={signOut} className="text-xs font-semibold uppercase tracking-wide text-slate-500 underline underline-offset-4">Sign out</button></div>}
+                {!user && authError && <div className="max-w-lg rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{authError}</div>}
+              </div>
+              <div className="relative z-[1] mt-16 flex items-end justify-between px-6 text-xs text-slate-500 sm:px-10 lg:px-16"><p className="max-w-sm leading-5">We build calm digital tools for learning, assessment, and better understanding.</p><button onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })} className="hidden items-center gap-3 uppercase tracking-wide sm:flex">Who we are <span className="h-px w-12 bg-slate-950" /></button></div>
             </motion.div>
           )}
 
