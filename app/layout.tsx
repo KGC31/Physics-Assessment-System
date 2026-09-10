@@ -3,11 +3,11 @@ import { Inter } from 'next/font/google';
 import { Providers } from '@/components/Providers';
 import './globals.css';
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ subsets: ['latin', 'vietnamese'] });
 
 export const metadata: Metadata = {
-  title: 'Hệ thống đánh giá thể chất',
-  description: 'Khảo sát thể chất Y học cổ truyền',
+  title: 'Study Constitution | Học tập và khảo sát thể chất',
+  description: 'Nền tảng học tập, khảo sát và đọc kết quả thể chất Y học cổ truyền rõ ràng hơn.',
 };
 
 export default function RootLayout({

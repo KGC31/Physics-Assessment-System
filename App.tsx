@@ -129,8 +129,8 @@ export default function App() {
         >
           <div className="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center text-white font-bold group-hover:bg-emerald-700 transition-colors">Y</div>
           <div>
-            <h1 className="text-lg font-semibold tracking-tight text-slate-900 leading-tight group-hover:text-emerald-700 transition-colors">HỆ THỐNG ĐÁNH GIÁ THỂ CHẤT</h1>
-            <p className="text-[10px] sm:text-xs text-slate-400 font-medium uppercase tracking-widest leading-none mt-1">Dành cho Nghiên cứu Y khoa</p>
+            <h1 className="text-lg font-semibold tracking-tight text-slate-900 leading-tight group-hover:text-emerald-700 transition-colors">Study Constitution</h1>
+            <p className="text-[10px] sm:text-xs text-slate-400 font-medium uppercase tracking-widest leading-none mt-1">Học tập & khảo sát y khoa</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -189,31 +189,26 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 1.05 }}
-              className="flex flex-col items-center justify-center flex-1 space-y-8 text-center min-h-[60vh]"
+              className="flex flex-col justify-center flex-1 py-4 sm:py-8 min-h-[60vh]"
             >
-              <div className="flex flex-col items-center space-y-6 max-w-2xl">
+              <div className="grid items-center gap-8 lg:grid-cols-[1.1fr_0.9fr] max-w-5xl w-full mx-auto">
                 <img 
                   src={logo} 
                   alt="Logo" 
-                  className="w-32 h-32 sm:w-40 sm:h-40 object-contain rounded-3xl shadow-xl border border-slate-100 bg-white p-3 transition-transform duration-300 hover:scale-105 mb-4" 
+                  className="w-16 h-16 object-contain rounded-xl border border-slate-200 bg-white p-2 shadow-sm" 
                 />
-                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-tight">
-                  <span className="text-emerald-600">Khảo sát Thể chất</span> <br />
-                  <span className="text-emerald-600">Y học cổ truyền</span>
-                </h1>
-                <p className="text-lg text-slate-500 max-w-lg mx-auto leading-relaxed">
-                  Công cụ hỗ trợ học tập và đánh giá 9 loại thể chất phổ biến dựa trên các biểu hiện lâm sàng. Dành riêng cho nghiên cứu và thực hành y khoa.
-                </p>
+                <div className="max-w-2xl"><p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Nền tảng học tập và khảo sát</p><h1 className="text-4xl font-bold leading-[1.05] tracking-tight text-slate-950 sm:text-6xl">Luyện tập có hệ thống.<br /><span className="text-emerald-700">Đọc kết quả dễ hiểu.</span></h1><p className="mt-5 max-w-xl text-base leading-7 text-slate-600">Khám phá 9 nhóm thể chất qua một bài khảo sát ngắn, trực quan và phù hợp cho học tập, nghiên cứu y khoa cổ truyền.</p></div>
               </div>
+              <div className="grid max-w-2xl grid-cols-3 gap-3 text-left"><div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"><p className="text-lg font-bold text-slate-950">09</p><p className="mt-1 text-xs leading-4 text-slate-500">nhóm thể chất</p></div><div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"><p className="text-lg font-bold text-slate-950">01</p><p className="mt-1 text-xs leading-4 text-slate-500">bài khảo sát</p></div><div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"><p className="text-lg font-bold text-slate-950">10′</p><p className="mt-1 text-xs leading-4 text-slate-500">thời gian dự kiến</p></div></div>
               <button
                 onClick={handleStart}
-                className="px-8 py-3 rounded-lg bg-emerald-700 text-white font-semibold hover:bg-emerald-800 transition-colors text-sm shadow-sm active:scale-95"
+                className="self-start rounded-lg bg-emerald-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 active:scale-95"
               >
                 {user ? 'Bắt đầu bài kiểm tra' : 'Đăng nhập để làm bài kiểm tra'}
               </button>
 
               {/* Auth-related buttons */}
-              <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
+              <div className="flex flex-wrap items-center gap-3 pt-1">
                 {!user ? (
                   <></>
                 ) : (
